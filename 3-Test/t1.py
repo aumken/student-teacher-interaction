@@ -4,65 +4,87 @@ import re
 from pathlib import Path
 
 import aiofiles
+import PyPDF2
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 # Load environment variables
-env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+env_path = Path(__file__).parent.joinpath("..", ".env")
 load_dotenv(env_path)
 
 # Initialize the OpenAI client with your API key
 client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-async def get_model_answers(questions, content, static_info, context):
+# Function to extract text from PDF, limited to the first 1500 characters
+def extract_text_from_pdf(filepath):
+    text = ""
+    with open(filepath, "rb") as file:
+        pdf = PyPDF2.PdfReader(file)
+        for page_num in range(len(pdf.pages)):
+            text += pdf.pages[page_num].extract_text()
+            if len(text) >= 1500:  # Stop if text length exceeds 1500 characters
+                break
+    return text[:1500]
+
+
+async def get_model_answers(questions, content, context):
     try:
         response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        f"You will be given a {context}, its analysis, and a set of 10 multiple-choice questions based on it. "
-                        "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                        "or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'."
-                        f"\n\n{context}: {content}\n"
-                        f"\n{context} Analysis: {static_info}\n"
-                    ),
+                    "content": f"You will be given a {context} and a set of 10 multiple-choice questions based on it. "
+                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                    f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'. Do not write out the entire answer, just the letter.\n\n Info: {content}\n",
                 },
-                {
-                    "role": "user",
-                    "content": f"{questions}",
-                },
+                {"role": "user", "content": questions},
             ],
         )
         raw_answers = response.choices[0].message.content.strip()
-        answers = "".join(filter(str.isalpha, raw_answers))[:10].upper()
-        return answers if len(answers) == 10 else "None"
+
+        continuous_pattern = re.compile(r"\b[A-D]{10}\b")
+        listed_pattern = re.compile(r"\b\d+[).]?\s*([A-D])")
+
+        continuous_match = continuous_pattern.search(raw_answers)
+        if continuous_match:
+            return continuous_match.group()
+
+        listed_matches = listed_pattern.findall(raw_answers)
+        if len(listed_matches) == 10:
+            return "".join(listed_matches)
+
+        return "None"  # Return "None" if the correct format isn't found
     except Exception as e:
         print(f"Error: {e}")
         return None
 
-async def process_question_file(questions_path, static_info_path, original_info_path, answers_path, context):
-    if not os.path.exists(static_info_path) or not os.path.exists(original_info_path):
+
+async def process_question_file(
+    questions_path, original_info_path, answers_path, context
+):
+    if not questions_path.exists() or not original_info_path.exists():
         print(f"Skipping {questions_path.name} due to missing information file.")
         return
 
-    async with aiofiles.open(static_info_path, "r") as file:
-        static_info = await file.read()
-
-    async with aiofiles.open(original_info_path, "r") as file:
-        content = await file.read()
+    # Determine the file format and read content accordingly
+    if original_info_path.suffix == ".pdf":
+        content = extract_text_from_pdf(original_info_path)
+    else:  # Assume Markdown or any text format
+        async with aiofiles.open(original_info_path, "r") as file:
+            content = await file.read()
 
     async with aiofiles.open(questions_path, "r") as file:
         questions = await file.read()
 
-    model_answers = await get_model_answers(questions, content, static_info, context)
+    model_answers = await get_model_answers(questions, content, context)
     if model_answers and len(model_answers) == 10:
-        Path(answers_path.parent).mkdir(parents=True, exist_ok=True)
+        answers_path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(answers_path, "w") as file:
             await file.write(model_answers)
 
-async def process_directory(questions_dir, static_dir, original_info_dir, answers_dir, context):
+
+async def process_directory(questions_dir, original_info_dir, answers_dir):
     tasks = []
 
     for root, _, files in os.walk(questions_dir):
@@ -70,23 +92,59 @@ async def process_directory(questions_dir, static_dir, original_info_dir, answer
             if file.startswith("question_") and file.endswith(".md"):
                 questions_path = Path(root) / file
                 relative_path = questions_path.relative_to(questions_dir)
-                static_info_path = static_dir / relative_path.with_name(f"static_{relative_path.stem[9:]}.md")
-                original_info_path = original_info_dir / relative_path.with_name(f"{relative_path.stem[9:]}.md")
-                answers_path = answers_dir / relative_path.with_name(f"t2_{relative_path.stem[9:]}.md")
+                original_info_md_path = original_info_dir / relative_path.with_name(
+                    f"{relative_path.stem[9:]}.md"
+                )
+                original_info_pdf_path = original_info_dir / relative_path.with_name(
+                    f"{relative_path.stem[9:]}.pdf"
+                )
 
-                task = process_question_file(questions_path, static_info_path, original_info_path, answers_path, context)
+                # Check for either MD or PDF original file
+                if original_info_md_path.exists():
+                    original_info_path = original_info_md_path
+                elif original_info_pdf_path.exists():
+                    original_info_path = original_info_pdf_path
+                else:
+                    print(
+                        f"Skipping {questions_path.name} due to missing information file."
+                    )
+                    continue
+
+                answers_path = answers_dir / relative_path.with_name(
+                    f"t1_{relative_path.stem[9:]}.md"
+                )
+
+                # Extract context from the directory structure
+                context = relative_path.parts[0]
+
+                task = process_question_file(
+                    questions_path,
+                    original_info_path,
+                    answers_path,
+                    context,
+                )
                 tasks.append(task)
 
     await asyncio.gather(*tasks)
 
-async def main(questions_base_dir, static_base_dir, original_info_base_dir, answers_base_dir, context):
-    await process_directory(questions_base_dir, static_base_dir, original_info_base_dir, answers_base_dir, context)
+
+async def main(
+    questions_base_dir, original_info_base_dir, answers_base_dir
+):
+    await process_directory(
+        questions_base_dir, original_info_base_dir, answers_base_dir
+    )
+
 
 if __name__ == "__main__":
-    context = input("Name of context? ")
-    questions_base_dir = Path(f"{context}_questions")
-    static_base_dir = Path(f"{context}_static")
-    original_info_base_dir = Path(context)
-    answers_base_dir = Path(f"{context}_t2_answers")
+    questions_base_dir = Path("b_questions")
+    original_info_base_dir = Path("a_files")
+    answers_base_dir = Path("t1_answers")
 
-    asyncio.run(main(questions_base_dir, static_base_dir, original_info_base_dir, answers_base_dir, context))
+    asyncio.run(
+        main(
+            questions_base_dir,
+            original_info_base_dir,
+            answers_base_dir,
+        )
+    )

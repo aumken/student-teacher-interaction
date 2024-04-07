@@ -20,7 +20,7 @@ def download_pdf(url, filename, folder):
     print(f"{filename} downloaded successfully.")
 
 
-def scrape_arxiv(categories, max_papers=50):
+def scrape_arxiv(categories, max_papers=2):
     """Scrape and download PDFs from arXiv for the given categories."""
     base_url = "https://arxiv.org/list/"
 

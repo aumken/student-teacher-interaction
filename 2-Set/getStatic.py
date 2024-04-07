@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import PyPDF2
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
@@ -16,6 +17,19 @@ instructions = {
     "news_articles": "Prepare the student for any quiz on this news article by outlining the main events, key figures, and the article's context. Ensure your summary is thorough, allowing the student to respond to questions on any detail of the article.",
     "song_lyrics": "Equip the student for any quiz on these song lyrics by dissecting the narrative, themes, and expressive techniques used. Provide a complete understanding, enabling the student to engage with questions on any aspect of the lyrics.",
 }
+
+
+def extract_text_from_pdf(filepath):
+    text = ""
+    with open(filepath, "rb") as file:
+        pdf = PyPDF2.PdfReader(file)
+        for page_num in range(len(pdf.pages)):
+            text += pdf.pages[page_num].extract_text()
+            if (
+                len(text) >= 1500
+            ):  # Check if the accumulated text has reached 1500 characters
+                break  # Stop reading further if 1500 characters have been reached
+    return text[:1500]  # Return only the first 1500 characters of the text
 
 
 async def generate_static(context, plot):
@@ -47,15 +61,20 @@ def save_to_file(content, folder, filename):
 
 
 async def process_file(context, filepath, root_folder):
-    with open(filepath, "r") as file:
-        plot = file.read()
+    # Extract text from PDF or read from Markdown file
+    if filepath.endswith(".pdf"):
+        plot = extract_text_from_pdf(filepath)
+    else:
+        with open(filepath, "r") as file:
+            plot = file.read()
 
     rel_path = os.path.relpath(filepath, start=root_folder)
     base_name = os.path.basename(filepath)
-    static_folder = os.path.join(
-        f"d_static", os.path.dirname(rel_path)
-    )
-    static_filename = f"static_{base_name}"
+    static_folder = os.path.join(f"d_static", os.path.dirname(rel_path))
+
+    # Ensure the output filename uses .md extension
+    static_filename = f"static_{os.path.splitext(base_name)[0]}.md"
+
     static_content = await generate_static(context, plot)
     if static_content:
         save_to_file(static_content, static_folder, static_filename)
@@ -67,6 +86,7 @@ async def process_directory(context, folder, root_folder):
             process_file(context, os.path.join(root, file), root_folder)
             for file in files
             if file.endswith(".md")
+            or file.endswith(".pdf")  # Include PDF files as well
         ]
         await asyncio.gather(*tasks)
 

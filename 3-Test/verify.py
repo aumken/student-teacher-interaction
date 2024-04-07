@@ -10,6 +10,13 @@ def check_answer_file(file_path):
 
 
 def verify_files(base_directory, base_mcq_folder, base_answer_folder):
+    prefix=""
+    if base_answer_folder == "c_answers": prefix = "answer"
+    elif base_answer_folder == "s1_answers": prefix = "s1"
+    elif base_answer_folder == "s2_answers": prefix = "s2"
+    elif base_answer_folder == "t1_answers": prefix = "t1"
+    elif base_answer_folder == "t2_answers": prefix = "t2"
+
     for context in os.listdir(base_directory):
         context_path = os.path.join(base_directory, context)
         if os.path.isdir(context_path):
@@ -21,7 +28,7 @@ def verify_files(base_directory, base_mcq_folder, base_answer_folder):
                 for file in files:
                     if file.endswith(".md"):
                         mcq_file_path = os.path.join(mcq_folder, f"question_{file}")
-                        answer_file_path = os.path.join(answer_folder, f"answer_{file}")
+                        answer_file_path = os.path.join(answer_folder, f"{prefix}_{file}")
 
                         if not os.path.exists(mcq_file_path):
                             print(f"Missing MCQ file: {mcq_file_path}")
@@ -34,6 +41,7 @@ def verify_files(base_directory, base_mcq_folder, base_answer_folder):
 if __name__ == "__main__":
     base_directory = "a_files"  # Directory containing all contexts
     base_mcq_folder = "b_questions"  # Directory where questions are stored
-    base_answer_folder = "s1_answers"  # Directory where answers are stored
-
-    verify_files(base_directory, base_mcq_folder, base_answer_folder)
+    dirs = ["s1", "s2", "t1", "t2"]
+    for directory in dirs:
+        base_answer_folder = f"{directory}_answers"  # Directory where answers are stored
+        verify_files(base_directory, base_mcq_folder, base_answer_folder)

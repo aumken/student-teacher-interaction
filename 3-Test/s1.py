@@ -44,7 +44,6 @@ async def get_model_answers(questions, context):
         if len(listed_matches) == 10:
             return "".join(listed_matches)
 
-        print(raw_answers)
         return "None"
 
     except Exception as e:

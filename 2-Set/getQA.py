@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import PyPDF2
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
@@ -34,13 +35,9 @@ def separate_mcqs_and_answers(mcqs_and_answers):
     lines = mcqs_and_answers.split("\n")
     for line in lines:
         if line.startswith("Correct Answer:"):
-            answer = line.split("Correct Answer:")[1].strip()
-            if answer in ["A", "B", "C", "D"]:
-                answers.append(answer)
+            answers.append(line.split("Correct Answer:")[1].strip())
         else:
             mcqs.append(line)
-
-
     return "\n".join(mcqs), "".join(answers)
 
 
@@ -51,56 +48,51 @@ def save_to_file(content, folder, filename):
         file.write(content)
 
 
+def extract_text_from_pdf(filepath):
+    text = ""
+    with open(filepath, "rb") as file:
+        pdf = PyPDF2.PdfReader(file)
+        for page_num in range(len(pdf.pages)):
+            text += pdf.pages[page_num].extract_text()
+            if (
+                len(text) >= 1500
+            ):  # Check if the accumulated text has reached 1500 characters
+                break  # Stop reading further if 1500 characters have been reached
+    return text[:1500]  # Return only the first 1500 characters of the text
+
+
 async def process_file(context, filepath, mcq_folder, answer_folder):
     filename = os.path.basename(filepath)
-    questions_filename = "question_" + filename
-    answers_filename = "answer_" + filename
+    # Keep the original file extension for Markdown files
+    questions_filename = "question_" + filename.replace(".pdf", ".md")
+    answers_filename = "answer_" + filename.replace(".pdf", ".md")
 
+    # Check if both files already exist to avoid re-processing
     if os.path.exists(os.path.join(mcq_folder, questions_filename)) and os.path.exists(
         os.path.join(answer_folder, answers_filename)
     ):
-        return  # Skip if both files already exist
+        return  # Skip processing if both files exist
 
-    with open(filepath, "r") as file:
-        plot = file.read()
+    # Extract text from PDF or read from Markdown file
+    if filepath.endswith(".pdf"):
+        plot = extract_text_from_pdf(filepath)
+    else:
+        with open(filepath, "r") as file:
+            plot = file.read()
 
-    attempts = 0
-    max_attempts = 5  # Set a limit to prevent infinite loops
-    while attempts < max_attempts:
-        mcq_and_answers = await generate_mcq(context, plot)
-        if mcq_and_answers:
-            mcqs, answers = separate_mcqs_and_answers(mcq_and_answers)
-            if len(answers) == 10:
-                save_to_file(mcqs, mcq_folder, questions_filename)
-                save_to_file(
-                    answers, answer_folder, answers_filename
-                )  # Save just the answers if there are exactly 10
-                if attempts >= 1:
-                    print(f"Attempt {attempts + 1}: Worked for {filename}.")
-                break  # Exit the loop if 10 answers are found
-            else:
-                print(
-                    f"Attempt {attempts + 1}: Not exactly 10 answers for {filename}."
-                )
-        attempts += 1
-
-    if attempts == max_attempts:
-        print(
-            f"Warning: Unable to get exactly 10 answers for {filename} after {max_attempts} attempts. Saving the last attempt."
-        )
-        save_to_file(
-            mcq_and_answers, answer_folder, answers_filename
-        )  # Save the last attempt regardless of answer count
+    # Generate MCQs and answers
+    mcq_and_answers = await generate_mcq(context, plot)
+    if mcq_and_answers:
+        mcqs, answers = separate_mcqs_and_answers(mcq_and_answers)
+        save_to_file(mcqs, mcq_folder, questions_filename)
+        save_to_file(answers, answer_folder, answers_filename)
 
 
 async def process_directory(
     context, folder, mcq_folder_base, answer_folder_base, root_folder
 ):
     for root, dirs, files in os.walk(folder):
-        # Get the relative path from the root folder to the current directory
         rel_path = os.path.relpath(root, root_folder)
-
-        # Construct the mcq and answer folders by joining the base folder with the relative path
         mcq_folder = os.path.join(mcq_folder_base, rel_path)
         answer_folder = os.path.join(answer_folder_base, rel_path)
 
@@ -110,7 +102,7 @@ async def process_directory(
         tasks = [
             process_file(context, os.path.join(root, file), mcq_folder, answer_folder)
             for file in files
-            if file.endswith(".md")
+            if file.endswith(".md") or file.endswith(".pdf")
         ]
 
         await asyncio.gather(*tasks)
