@@ -50,10 +50,12 @@ def get_question_from_student(context, message_history):
 
     return student_response
 
-def eval_student(context, questions, msg_history, out_dir, n_turn):
+def eval_student(context, questions, message_history, out_dir, n_turn):
+    new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+                                          "content": x["content"]}, message_history))
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=msg_history + [{"role": "system",
+        messages=new_history + [{"role": "system",
                    "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
                    "Answer questions based on the information you inferred from previous conversation. "
                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
