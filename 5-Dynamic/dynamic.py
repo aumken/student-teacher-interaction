@@ -3,7 +3,7 @@ from openai import OpenAI
 import json
 from dotenv import load_dotenv
 import re
-from utils import get_all_content
+from utils import get_all_content, get_all_data
 import argparse
 from typing import List, Dict
 
@@ -23,6 +23,14 @@ STUDENT_INSTRUCTIONS = {
     "song_lyrics": "To learn more about song lyrics that only the teacher knows about and get prepared for any quiz on that, ask questions on the narrative, themes, and expressive techniques used. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points to gain deeper understanding of the topic. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
 }
 
+SCORE_BASED_STUDENT_INSTRUCTIONS = {
+    "movie_plots": "You scored {score}% on the quiz about the movie plot. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
+    "image": "You scored {score}% on the quiz about the image. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
+    "academic_papers": "You scored {score}% on the quiz about the academic paper. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
+    "news_articles": "You scored {score}% on the quiz about the news article. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
+    "song_lyrics": "You scored {score}% on the quiz about the song lyrics. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!"
+}
+
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(env_path)
 
@@ -40,18 +48,20 @@ def get_answer_from_teacher(context: str, content: str, message_history: List[Di
 
     return teacher_response
 
-def get_question_from_student(context, message_history):
+def get_question_from_student(context, message_history, accuracy = None):
     # to obtan question from student, treat student as assistant and teacher as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                           "content": x["content"]}, message_history))
+
+    instruction = STUDENT_INSTRUCTIONS[context] if accuracy is None else SCORE_BASED_STUDENT_INSTRUCTIONS[context].format(score=accuracy*100)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
-        messages=[{"role": "system", "content": STUDENT_INSTRUCTIONS[context]}] + new_history)
+        messages=[{"role": "system", "content": instruction}] + new_history)
     student_response = response.choices[0].message.content
 
     return student_response
 
-def eval_student(context, questions, message_history, out_dir, n_turn):
+def eval_student(context, questions, message_history, true_answers, n_turn):
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                           "content": x["content"]}, message_history))
     response = client.chat.completions.create(
@@ -70,45 +80,54 @@ def eval_student(context, questions, message_history, out_dir, n_turn):
 
     continuous_match = continuous_pattern.search(raw_answers)
     if continuous_match:
-        return continuous_match.group()
+        answer_list = continuous_match.group()
+    else:
+        listed_matches = listed_pattern.findall(raw_answers)
+        answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
 
-    listed_matches = listed_pattern.findall(raw_answers)
-    answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
+    acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
+    return answer_list, acc
 
-    with open(os.path.join(out_dir, f"eval_{n_turn}"), "w") as file:
-        file.write(answer_list)
-
-def run_conversation(context, content, questions, out_dir, n_turn: int = 10):
+def run_conversation(context, content, questions, true_answers, out_dir, n_turn: int = 10, is_score_informed=False):
     msg_history = []
+    outputs = []
     for i in range(n_turn):
-        q = get_question_from_student(context, msg_history)
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i)
+        outputs.append((student_quiz_answers, acc))
+        q = get_question_from_student(context, msg_history, accuracy = acc if is_score_informed else None)
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history)
         msg_history.append({"role": "teacher", "content": answer})
         # evaluate student perf based on current conversation
-        eval_student(context, questions, msg_history, out_dir, i)
 
-    return msg_history
+    return msg_history, outputs
 
-def run(context, n_turn, questions_path, context_folder, root_folder, out_dir):
-    with open(questions_path, "r") as file:
-        questions = file.read()
+def run(context, n_turn, is_score_informed, questions_folder, answers_folder, context_folder, root_folder, out_dir):
+    data = get_all_data(context, context_folder, questions_folder, answers_folder, root_folder)
+    results = []
+
+    for title, context, content, questions, answers in data:
+        msg_history, outputs = run_conversation(context, content, questions, answers, out_dir, n_turn, is_score_informed)
+        for i, output in enumerate(outputs):
+            student_answers, acc = output
+            results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
+                            'accuracy': acc, 'turn': i})
+        with open(os.path.join(out_dir, f'chat_history_{title}.json'), 'w') as f:
+            json.dump(msg_history, f, indent=4)
     
-    contents = get_all_content(context, context_folder, root_folder)
-    for content in contents:
-        msg_history = run_conversation(context, content, questions, out_dir, n_turn)
-        # save msg_history
-        with open(os.path.join(out_dir, f"chat_history.json"), "w") as f:
-            json.dump(msg_history, f, indent=6)
+    with open(os.path.join(out_dir, f'results.json'), 'w') as f:
+        json.dump(results, f, indent=4)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Set up dynamic conversation between student and teacher')
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
     parser.add_argument("--num-turns", type=int, default=10, required=False)
-    parser.add_argument("--questions-path", required=False)
+    parser.add_argument("--score-informed", action='store_true', required=False)
+    parser.add_argument("--answers-folder", required=False)
+    parser.add_argument("--questions-folder", required=False)
     parser.add_argument("--context-folder", required=True)
     parser.add_argument("--root-folder", required=True)
     parser.add_argument("--output-folder", required=True)
 
     args = parser.parse_args()
-    run(args.context, args.num_turns, args.questions_path, args.context_folder, args.root_folder, args.output_folder)
+    run(args.context, args.num_turns, args.score_informed, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.output_folder)
