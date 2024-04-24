@@ -32,8 +32,9 @@ SCORE_BASED_STUDENT_INSTRUCTIONS = {
     "song_lyrics": "You scored {score}% on the quiz about the song lyrics. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!"
 }
 
-env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-load_dotenv(env_path)
+QUESTION_SENTENCE = " Do you have any other questions?"
+
+#env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -100,7 +101,7 @@ def run_conversation(context, content, questions, true_answers, out_dir, n_turn:
         q = get_question_from_student(context, msg_history, accuracy = acc if is_score_informed else None)
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history)
-        msg_history.append({"role": "teacher", "content": answer})
+        msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
         # evaluate student perf based on current conversation
 
     return msg_history, outputs
