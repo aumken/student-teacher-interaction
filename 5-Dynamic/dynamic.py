@@ -63,17 +63,45 @@ def get_question_from_student(context, message_history, accuracy = None):
 
     return student_response
 
-def eval_student(context, questions, message_history, true_answers, n_turn):
-    new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+
+def extract_summary_from_chat(message_history, context):
+    if len(message_history) == 0:
+        return ""
+    new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
                                           "content": x["content"]}, message_history))
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=new_history + [{"role": "system",
-                   "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
-                   "Answer questions based on the information you inferred from previous conversation. "
-                   "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                   f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
-                   }, {"role": "user", "content": questions}])
+            model="gpt-3.5-turbo",
+            messages=new_history + [{"role": "system",
+                       "content": f"Based on this conversation, generate a comprehensive summary about the topic. "
+                       "Include all the important points so that a student can answer wide range of related questions on this topic."
+                        }])
+
+    return response.choices[0].message.content.strip()
+
+def eval_student(context, questions, message_history, true_answers, n_turn, aggregate_answers = False):
+    if aggregate_answers:
+        #summary = ' '.join([msg["content"][:-len(QUESTION_SENTENCE)] for msg in message_history if msg["role"] == "teacher"])
+        summary = extract_summary_from_chat(message_history, context).replace('\n', ' ')
+        print(f"{summary}\n-------------")
+
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system",
+                       "content": f"You will be given a brief summary of a {context} and a set of 10 multiple-choice questions based on it. "
+                                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                                    f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n Summary: {summary}\n",
+                        }, {"role": "user", "content": questions}])
+    else:
+        new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+                                          "content": x["content"]}, message_history))
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=new_history + [{"role": "system",
+                       "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
+                       "Answer questions based on the information you inferred from previous conversation. "
+                       "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                       f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
+                       }, {"role": "user", "content": questions}])
     
     raw_answers = response.choices[0].message.content.strip()
 
@@ -92,11 +120,11 @@ def eval_student(context, questions, message_history, true_answers, n_turn):
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, out_dir, n_turn: int = 10, is_score_informed=False):
+def run_conversation(context, content, questions, true_answers, out_dir, n_turn: int = 10, is_score_informed=False, aggregate_answers=False):
     msg_history = []
     outputs = []
     for i in range(n_turn):
-        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i)
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers)
         outputs.append((student_quiz_answers, acc))
         q = get_question_from_student(context, msg_history, accuracy = acc if is_score_informed else None)
         msg_history.append({"role": "student", "content": q})
@@ -106,7 +134,7 @@ def run_conversation(context, content, questions, true_answers, out_dir, n_turn:
 
     return msg_history, outputs
 
-def run(context, n_turn, is_score_informed, questions_folder, answers_folder, context_folder, root_folder, out_dir):
+def run(context, n_turn, is_score_informed, aggregate_answers, questions_folder, answers_folder, context_folder, root_folder, out_dir):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, root_folder)
     results = []
 
@@ -127,6 +155,7 @@ if __name__ == '__main__':
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
     parser.add_argument("--num-turns", type=int, default=10, required=False)
     parser.add_argument("--score-informed", action='store_true', required=False)
+    parser.add_argument("--aggregate-answers", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=False)
     parser.add_argument("--questions-folder", required=False)
     parser.add_argument("--context-folder", required=True)
@@ -134,4 +163,4 @@ if __name__ == '__main__':
     parser.add_argument("--output-folder", required=True)
 
     args = parser.parse_args()
-    run(args.context, args.num_turns, args.score_informed, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.output_folder)
+    run(args.context, args.num_turns, args.score_informed, args.aggregate_answers, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.output_folder)
