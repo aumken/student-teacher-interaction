@@ -87,7 +87,7 @@ def eval_student(context, questions, message_history, true_answers, n_turn):
         answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
 
     if answer_list is None:
-        "NA", 0.0
+        return "NA", 0.0
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
