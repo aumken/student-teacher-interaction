@@ -6,6 +6,7 @@ import re
 from utils import get_all_content, get_all_data
 import argparse
 from typing import List, Dict
+from tqdm import tqdm
 
 TEACHER_INSTRUCTIONS = {
     "movie_plots": "Prepare the student comprehensively for any quiz on this movie plot, by answering questions on its storyline, character arcs, themes, and significant scenes. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
@@ -108,8 +109,8 @@ def run(context, n_turn, is_score_informed, questions_folder, answers_folder, co
     data = get_all_data(context, context_folder, questions_folder, answers_folder, root_folder)
     results = []
 
-    for title, context, content, questions, answers in data:
-        msg_history, outputs = run_conversation(context, content, questions, answers, out_dir, n_turn, is_score_informed)
+    for title, context, content, questions, answers in tqdm(data):
+        msg_history, outputs = run_conversation(context, content, questions, answers, out_dir, n_turn, is_score_informed, aggregate_answers)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
