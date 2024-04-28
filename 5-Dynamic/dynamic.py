@@ -128,8 +128,10 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, out_dir, n_turn: int = 10, is_score_informed=False, aggregate_answers=False):
-    msg_history = []
+def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, is_score_informed=False, aggregate_answers=False, provide_lesson=False):
+    msg_history = [{"role": "teacher", 
+                    "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
+                    f"You can ask me any question about the {context.replace('_', ' ')}."}]
     outputs = []
     for i in range(n_turn):
         student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers)
@@ -142,12 +144,12 @@ def run_conversation(context, content, questions, true_answers, out_dir, n_turn:
 
     return msg_history, outputs
 
-def run(context, n_turn, is_score_informed, aggregate_answers, questions_folder, answers_folder, context_folder, root_folder, out_dir):
-    data = get_all_data(context, context_folder, questions_folder, answers_folder, root_folder)
+def run(context, n_turn, is_score_informed, aggregate_answers, provide_lesson, questions_folder, answers_folder, context_folder, root_folder, static_folder, out_dir):
+    data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
-    for title, context, content, questions, answers in tqdm(data):
-        msg_history, outputs = run_conversation(context, content, questions, answers, out_dir, n_turn, is_score_informed, aggregate_answers)
+    for title, context, content, questions, answers, static_lesson in tqdm(data):
+        msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, n_turn, is_score_informed, aggregate_answers, provide_lesson)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
@@ -164,11 +166,13 @@ if __name__ == '__main__':
     parser.add_argument("--num-turns", type=int, default=10, required=False)
     parser.add_argument("--score-informed", action='store_true', required=False)
     parser.add_argument("--aggregate-answers", action='store_true', required=False)
+    parser.add_argument("--provide-lesson", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=False)
     parser.add_argument("--questions-folder", required=False)
     parser.add_argument("--context-folder", required=True)
+    parser.add_argument("--static-folder", required=True)
     parser.add_argument("--root-folder", required=True)
     parser.add_argument("--output-folder", required=True)
 
     args = parser.parse_args()
-    run(args.context, args.num_turns, args.score_informed, args.aggregate_answers, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.output_folder)
+    run(args.context, args.num_turns, args.score_informed, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
