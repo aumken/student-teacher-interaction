@@ -32,17 +32,25 @@ SCORE_BASED_STUDENT_INSTRUCTIONS = {
     "song_lyrics": "You scored {score}% on the quiz about the song lyrics. To improve your score, you are allowed to ask a teacher clarifying questions or explanations. The questions must be formatted to be binary yes/no question or an open-ended question that helps maximally improve your performance in the next turn. Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!"
 }
 
+SCORE_BASED_TEACHER_INSTRUCTIONS = {
+    "movie_plots": "The student scored {score}% on the quiz about the movie plot. To improve the student's performance on the quiz about the movie plot, focus  on answering questions on its storyline, character arcs, themes, and significant scenes. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
+    "image": "The student scored {score}% on the quiz about the image. To improve the student's performance on the quiz about the image, focus on answering questions on its elements, composition, and context. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
+    "academic_papers": "The student scored {score}% on the quiz about the academic paper. To improve the student's performance on the quiz about the academic paper, focus on answering any question on its objectives, methodology, findings, and significance. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
+    "news_articles": "The student scored {score}% on the quiz about the news article. To improve the student's performance on the quiz about the news article, focus on answering any question on the main events, key figures, and the article's context. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
+    "song_lyrics": "The student scored {score}% on the quiz about the song lyrics. To improve the student's performance on the quiz about the song lyrics, focus on answering any questions related to the narrative, themes, and expressive techniques used. Content: {content}\n Do not ask any questions to the student, only answer the questions!",
+}
+
 QUESTION_SENTENCE = " Do you have any other questions?"
 
 #env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-def get_answer_from_teacher(context: str, content: str, message_history: List[Dict]):
+def get_answer_from_teacher(context: str, content: str, message_history: List[Dict], accuracy = None):
     # to obtan answer from teacher, treat teacher as assistant and student as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
                                           "content": x["content"]}, message_history))
-    instruction = TEACHER_INSTRUCTIONS[context].format(content=content)
+    instruction = TEACHER_INSTRUCTIONS[context].format(content=content) if accuracy is None else SCORE_BASED_TEACHER_INSTRUCTIONS[context].format(content=content, score=accuracy*100)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
         messages=[{"role": "system", "content": instruction}] + new_history)
@@ -128,7 +136,7 @@ def run_conversation(context, content, questions, true_answers, out_dir, n_turn:
         outputs.append((student_quiz_answers, acc))
         q = get_question_from_student(context, msg_history, accuracy = acc if is_score_informed else None)
         msg_history.append({"role": "student", "content": q})
-        answer = get_answer_from_teacher(context, content, msg_history)
+        answer = get_answer_from_teacher(context, content, msg_history, accuracy = acc if is_score_informed else None)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
         # evaluate student perf based on current conversation
 
