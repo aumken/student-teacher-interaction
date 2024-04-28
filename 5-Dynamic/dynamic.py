@@ -87,44 +87,52 @@ def extract_summary_from_chat(message_history, context):
     return response.choices[0].message.content.strip()
 
 def eval_student(context, questions, message_history, true_answers, n_turn, aggregate_answers = False):
-    if aggregate_answers:
-        #summary = ' '.join([msg["content"][:-len(QUESTION_SENTENCE)] for msg in message_history if msg["role"] == "teacher"])
-        summary = extract_summary_from_chat(message_history, context).replace('\n', ' ')
-        print(f"{summary}\n-------------")
+    answer_list = None
+    num_trials = 0
+    while answer_list is None:
+        if num_trials > 2:
+            break
+        if aggregate_answers:
+            #summary = ' '.join([msg["content"][:-len(QUESTION_SENTENCE)] for msg in message_history if msg["role"] == "teacher"])
+            summary = extract_summary_from_chat(message_history, context).replace('\n', ' ')
+            print(f"{summary}\n-------------")
 
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system",
-                       "content": f"You will be given a brief summary of a {context} and a set of 10 multiple-choice questions based on it. "
-                                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                                    f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n Summary: {summary}\n",
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "system",
+                        "content": f"You will be given a brief summary of a {context} and a set of 10 multiple-choice questions based on it. "
+                                        "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                                        f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n Summary: {summary}\n",
+                            }, {"role": "user", "content": questions}])
+        else:
+            new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+                                            "content": x["content"]}, message_history))
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=new_history + [{"role": "system",
+                        "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
+                        "Answer questions based on the information you inferred from previous conversation. "
+                        "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                        f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'. Stick to these formats!\n\n",
                         }, {"role": "user", "content": questions}])
-    else:
-        new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
-                                          "content": x["content"]}, message_history))
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=new_history + [{"role": "system",
-                       "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
-                       "Answer questions based on the information you inferred from previous conversation. "
-                       "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                       f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
-                       }, {"role": "user", "content": questions}])
-    
-    raw_answers = response.choices[0].message.content.strip()
+        
+        raw_answers = response.choices[0].message.content.strip()
 
-    continuous_pattern = re.compile(r"\b[A-D]{10}\b")
-    listed_pattern = re.compile(r"\b\d+[).]?\s*([A-D])")
+        continuous_pattern = re.compile(r"\b[A-D]{10}\b")
+        listed_pattern = re.compile(r"\b\d+[).]?\s*([A-D])")
 
-    continuous_match = continuous_pattern.search(raw_answers)
-    if continuous_match:
-        answer_list = continuous_match.group()
-    else:
-        listed_matches = listed_pattern.findall(raw_answers)
-        answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
+        continuous_match = continuous_pattern.search(raw_answers)
+        if continuous_match:
+            answer_list = continuous_match.group()
+        else:
+            listed_matches = listed_pattern.findall(raw_answers)
+            answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
+        
+        num_trials += 1
 
     if answer_list is None:
         return "NA", 0.0
+    
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
