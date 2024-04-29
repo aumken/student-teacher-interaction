@@ -46,11 +46,11 @@ QUESTION_SENTENCE = " Do you have any other questions?"
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-def get_answer_from_teacher(context: str, content: str, message_history: List[Dict], accuracy = None):
+def get_answer_from_teacher(context: str, content: str, message_history: List[Dict]):
     # to obtan answer from teacher, treat teacher as assistant and student as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
                                           "content": x["content"]}, message_history))
-    instruction = TEACHER_INSTRUCTIONS[context].format(content=content) if accuracy is None else SCORE_BASED_TEACHER_INSTRUCTIONS[context].format(content=content, score=accuracy*100)
+    instruction = TEACHER_INSTRUCTIONS[context].format(content=content)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
         messages=[{"role": "system", "content": instruction}] + new_history)
@@ -58,12 +58,12 @@ def get_answer_from_teacher(context: str, content: str, message_history: List[Di
 
     return teacher_response
 
-def get_question_from_student(context, message_history, accuracy = None):
+def get_question_from_student(context, message_history):
     # to obtan question from student, treat student as assistant and teacher as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                           "content": x["content"]}, message_history))
 
-    instruction = STUDENT_INSTRUCTIONS[context] if accuracy is None else SCORE_BASED_STUDENT_INSTRUCTIONS[context].format(score=accuracy*100)
+    instruction = STUDENT_INSTRUCTIONS[context]
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
         messages=[{"role": "system", "content": instruction}] + new_history)
@@ -136,7 +136,7 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, is_score_informed=False, aggregate_answers=False, provide_lesson=False):
+def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, aggregate_answers=False, provide_lesson=False):
     msg_history = [{"role": "teacher", 
                     "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
@@ -144,20 +144,20 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
     for i in range(n_turn):
         student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers)
         outputs.append((student_quiz_answers, acc))
-        q = get_question_from_student(context, msg_history, accuracy = acc if is_score_informed else None)
+        q = get_question_from_student(context, msg_history)
         msg_history.append({"role": "student", "content": q})
-        answer = get_answer_from_teacher(context, content, msg_history, accuracy = acc if is_score_informed else None)
+        answer = get_answer_from_teacher(context, content, msg_history)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
         # evaluate student perf based on current conversation
 
     return msg_history, outputs
 
-def run(context, n_turn, is_score_informed, aggregate_answers, provide_lesson, questions_folder, answers_folder, context_folder, root_folder, static_folder, out_dir):
+def run(context, n_turn, aggregate_answers, provide_lesson, questions_folder, answers_folder, context_folder, root_folder, static_folder, out_dir):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
     for title, context, content, questions, answers, static_lesson in tqdm(data):
-        msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, n_turn, is_score_informed, aggregate_answers, provide_lesson)
+        msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, n_turn, aggregate_answers, provide_lesson)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
@@ -172,7 +172,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Set up dynamic conversation between student and teacher')
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
     parser.add_argument("--num-turns", type=int, default=10, required=False)
-    parser.add_argument("--score-informed", action='store_true', required=False)
     parser.add_argument("--aggregate-answers", action='store_true', required=False)
     parser.add_argument("--provide-lesson", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=False)
@@ -183,4 +182,5 @@ if __name__ == '__main__':
     parser.add_argument("--output-folder", required=True)
 
     args = parser.parse_args()
-    run(args.context, args.num_turns, args.score_informed, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
+    print(args.static_folder)
+    run(args.context, args.num_turns, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
