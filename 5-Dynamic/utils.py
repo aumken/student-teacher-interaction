@@ -37,11 +37,14 @@ def process_directory(context, folder, root_folder):
     
     return tasks
 
-def get_all_data(context, context_folder, questions_folder, answers_folder, root_folder):
+def get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder):
     tasks = []
     for root, dirs, files in os.walk(context_folder):
         for file in files:
             context, content = process_file(context, os.path.join(root, file))
+
+            static_path = os.path.join(root.replace(context_folder, static_folder), f'static_{file}')
+            _, static_lesson = process_file(context, static_path)
 
             questions_path = os.path.join(root.replace(context_folder, questions_folder), f'question_{file}')
             _ , questions = process_file(context, questions_path)
@@ -49,7 +52,7 @@ def get_all_data(context, context_folder, questions_folder, answers_folder, root
             answers_path = os.path.join(root.replace(context_folder, answers_folder), f'answer_{file}')
             _ , answers = process_file(context, answers_path)
 
-            tasks.append((file, context, content, questions, answers))
+            tasks.append((file, context, content, questions, answers, static_lesson))
     
     return tasks
 
