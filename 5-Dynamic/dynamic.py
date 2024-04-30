@@ -7,6 +7,11 @@ from utils import get_all_content, get_all_data
 import argparse
 from typing import List, Dict
 from tqdm import tqdm
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM
+import torch
+import nltk
+
+nltk.data.path.append('.')
 
 TEACHER_INSTRUCTIONS = {
     "movie_plots": "Prepare the student comprehensively for any quiz on this movie plot, by answering questions on its storyline, character arcs, themes, and significant scenes. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers! Include specific event and character-related details in your answers like what happened, who performed specific actions, and who was involved.",
@@ -17,11 +22,15 @@ TEACHER_INSTRUCTIONS = {
 }
 
 STUDENT_INSTRUCTIONS = {
-    "movie_plots": "To learn more about the movie plot that only teacher knows about and get prepared for any quiz on that, ask questions on its storyline, character arcs, themes, and significant scenes. First, request a brief summary of the plot. Then, ask questions about what happened, who performed specific actions, and who was involved. Prefer asking factual questions rather than abstract ones. Ask about particular details like name of characters, objects, places and dates etc. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. Try to think of what you would ask to a student in a quiz about a movie plot if you were a student and ask questions based on this reasoning. NEVER PROMPT TEACHER TO ASK ANY QUESTION! Ask factual questions!",
+    "movie_plots": "To learn more about the movie plot known only to the teacher and get prepared for any quiz on that, ask questions on its storyline, character arcs, themes, and significant scenes. Ask diverse questions encompassing plot progression, character actions, involvement, thematic exploration, and character motivations. Include questions seeking specific details such as character names, objects, settings, and dates. Include questions that prompt thorough analysis of the plot and a deeper comprehension of its unfolding events. Ensure questions are diverse and comprehensive, covering all facets of the movie. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
     "image": "To learn more about an image that only the teacher has seen and get prepared for any quiz on that image, ask detailed questions on its elements, composition, and context. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points to gain deeper understanding of the topic. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
     "academic_papers": "To learn more about an academic paper that only the teacher knows about and get prepared for any quiz on that, ask questions on its objectives, methodology, findings, and significance. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points to gain deeper understanding of the topic. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
     "news_articles": "To learn more about a news article that only the teacher knows about and get prepared for any quiz on that, ask questions on the main events, key figures, and the article's context. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points to gain deeper understanding of the topic. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
     "song_lyrics": "To learn more about song lyrics that only the teacher knows about and get prepared for any quiz on that, ask questions on the narrative, themes, and expressive techniques used. Ensure questions are diverse and cover all aspects. Ask one question at a time. Also, feel free to ask detailed questions about particular points to gain deeper understanding of the topic. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time. NEVER PROMPT TEACHER TO ASK ANY QUESTION, NEVER tell teacher to feel free to ask anything, they cannot ask questions, only you can ask questions!",
+}
+
+STUDENT_INSTRUCTIONS_MQ = {
+    "movie_plots": "To learn more about the movie plot known only to the teacher and get prepared for any quiz on that, ask questions on its storyline, character arcs, themes, and significant scenes. Each time pose an array of diverse questions encompassing plot progression, character actions, involvement, thematic exploration, and character motivations. Include questions seeking specific details such as character names, objects, settings, and dates. Include questions that prompt thorough analysis of the plot and a deeper comprehension of its unfolding events. Ensure questions are diverse and comprehensive, covering all facets of the movie. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
 }
 
 QUESTION_SENTENCE = " Do you have any other questions?"
@@ -30,7 +39,7 @@ QUESTION_SENTENCE = " Do you have any other questions?"
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-def get_answer_from_teacher(context: str, content: str, message_history: List[Dict]):
+def get_answer_from_teacher(context: str, content: str, message_history: List[Dict], seed: int = 123):
     # to obtan answer from teacher, treat teacher as assistant and student as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
                                           "content": x["content"]}, message_history))
@@ -57,6 +66,55 @@ def get_question_from_student(context, message_history, seed: int = 123):
 
     return student_response
 
+
+def get_refined_question_from_student(context, message_history, lesson, seed: int = 123):
+    def _get_entailment_score(model, tokenizer, sentences, question):
+        #inputs = tokenizer([(s, question) for s in sentences], padding=True, truncation=True, return_tensors='pt').to('cuda:0')
+        #label_mapping = ['contradiction', 'entailment', 'neutral']
+        #entailment_idx = label_mapping.index('entailment')
+        inputs = tokenizer([f"premise: {s} hypothesis: {question}" for s in sentences], 
+                           padding=True, truncation=True, return_tensors='pt')['input_ids'].to('cuda:0')
+        model.eval()
+        entailment_idx = tokenizer.convert_tokens_to_ids(['1'])[0]
+        
+        with torch.no_grad():
+            scores = nli_model.generate(inputs, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores
+            #scores = model(**inputs).logits
+            total_score = torch.sum(scores[0][:, entailment_idx], dim=0).cpu().item()
+
+        return total_score
+    # to obtan question from student, treat student as assistant and teacher as user
+    new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+                                          "content": x["content"]}, message_history))
+
+    instruction = STUDENT_INSTRUCTIONS_MQ[context]
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo", 
+        messages=new_history + [{"role": "user", "content": instruction}],
+        seed=seed)
+    student_response = response.choices[0].message.content
+
+    questions = nltk.sent_tokenize(student_response) # split into questions
+    
+    lesson_sentences = nltk.sent_tokenize(lesson)
+    q_scores = [_get_entailment_score(nli_model, nli_tokenizer, lesson_sentences, q) for q in questions]
+    print(questions)
+    print(q_scores)
+    print("------")
+    
+    min_idx = torch.argmin(torch.tensor(q_scores)).item()
+    return questions[min_idx]
+
+def get_brief_summary_from_teacher(context, content, seed: int = 123):
+    instruction = f"Could you provide a brief summary of the following {context.replace('_', ' ')}? Content: {content}"
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo", 
+        messages=[{"role": "system", "content": instruction}],
+        seed=seed)
+    
+    response = response.choices[0].message.content
+
+    return response
 
 def extract_summary_from_chat(message_history, context, seed: int = 123):
     if len(message_history) == 0:
@@ -128,26 +186,30 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
 def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, aggregate_answers=False, provide_lesson=False, seed:int = 123):    
     msg_history = [{"role": "teacher", 
                     "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
+                    (f"Here is a brief summary of the {context.replace('_', ' ')}: {get_brief_summary_from_teacher(context, content)}\n" if refine_questions else "") +
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
+    
     outputs = []
     for i in range(n_turn):
         student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers, seed)
         outputs.append((student_quiz_answers, acc))
+        #chat_summary = ' '.join([msg['content'] for msg in msg_history if msg['role'] == 'teacher'])
+        q =  get_refined_question_from_student(context, msg_history, static, seed) if refine_questions else get_question_from_student(context, msg_history, seed)
         q = get_question_from_student(context, msg_history, seed)
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
-        # evaluate student perf based on current conversation
 
     return msg_history, outputs
 
+def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, questions_folder, 
         answers_folder, context_folder, root_folder, static_folder, out_dir, seed: int = 123):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
     for title, context, content, questions, answers, static_lesson in tqdm(data):
         msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, 
-                                                n_turn, aggregate_answers, provide_lesson, seed)
+                                                n_turn, refine_questions, aggregate_answers, provide_lesson, seed)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
@@ -163,6 +225,7 @@ if __name__ == '__main__':
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
     parser.add_argument("--num-turns", type=int, default=10, required=False)
     parser.add_argument("--aggregate-answers", action='store_true', required=False)
+    parser.add_argument("--refine-questions", action='store_true', required=False)
     parser.add_argument("--provide-lesson", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=False)
     parser.add_argument("--questions-folder", required=False)
@@ -174,4 +237,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args.static_folder)
+    if args.refine_questions:
+        nli_model = AutoModelForSeq2SeqLM.from_pretrained('google/t5_xxl_true_nli_mixture', device_map='cuda', torch_dtype=torch.bfloat16)
+        nli_tokenizer = AutoTokenizer.from_pretrained('google/t5_xxl_true_nli_mixture')
+    run(args.context, args.num_turns, args.refine_questions, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
     run(args.context, args.num_turns, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed)
