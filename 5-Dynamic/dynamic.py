@@ -37,12 +37,13 @@ def get_answer_from_teacher(context: str, content: str, message_history: List[Di
     instruction = TEACHER_INSTRUCTIONS[context].format(content=content)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
-        messages=[{"role": "system", "content": instruction}] + new_history)
+        messages=[{"role": "system", "content": instruction}] + new_history,
+        seed=seed)
     teacher_response = response.choices[0].message.content
 
     return teacher_response
 
-def get_question_from_student(context, message_history):
+def get_question_from_student(context, message_history, seed: int = 123):
     # to obtan question from student, treat student as assistant and teacher as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                           "content": x["content"]}, message_history))
@@ -50,13 +51,14 @@ def get_question_from_student(context, message_history):
     instruction = STUDENT_INSTRUCTIONS[context]
     response = client.chat.completions.create(
         model="gpt-3.5-turbo", 
-        messages=[{"role": "system", "content": instruction}] + new_history)
+        messages=[{"role": "system", "content": instruction}] + new_history,
+        seed=seed)
     student_response = response.choices[0].message.content
 
     return student_response
 
 
-def extract_summary_from_chat(message_history, context):
+def extract_summary_from_chat(message_history, context, seed: int = 123):
     if len(message_history) == 0:
         return ""
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
@@ -66,11 +68,12 @@ def extract_summary_from_chat(message_history, context):
             messages=new_history + [{"role": "system",
                        "content": f"Based on this conversation, generate a comprehensive summary about the topic. "
                        "Include all the important points so that a student can answer wide range of related questions on this topic."
-                        }])
+                        }],
+            seed=seed)
 
     return response.choices[0].message.content.strip()
 
-def eval_student(context, questions, message_history, true_answers, n_turn, aggregate_answers = False):
+def eval_student(context, questions, message_history, true_answers, n_turn, aggregate_answers = False, seed: int = 123):
     answer_list = None
     num_trials = 0
     while answer_list is None:
@@ -83,6 +86,7 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
 
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
+                seed=seed,
                 messages=[{"role": "system",
                         "content": f"You will be given a brief summary of a {context} and a set of 10 multiple-choice questions based on it. "
                                         "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
@@ -93,6 +97,7 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
                                             "content": x["content"]}, message_history))
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
+                seed=seed,
                 messages=new_history + [{"role": "system",
                         "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
                         "Answer questions based on the information you inferred from previous conversation. "
@@ -120,28 +125,29 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, aggregate_answers=False, provide_lesson=False):
+def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, aggregate_answers=False, provide_lesson=False, seed:int = 123):    
     msg_history = [{"role": "teacher", 
                     "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
     outputs = []
     for i in range(n_turn):
-        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers)
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers, seed)
         outputs.append((student_quiz_answers, acc))
-        q = get_question_from_student(context, msg_history)
+        q = get_question_from_student(context, msg_history, seed)
         msg_history.append({"role": "student", "content": q})
-        answer = get_answer_from_teacher(context, content, msg_history)
+        answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
         # evaluate student perf based on current conversation
 
     return msg_history, outputs
 
-def run(context, n_turn, aggregate_answers, provide_lesson, questions_folder, answers_folder, context_folder, root_folder, static_folder, out_dir):
+        answers_folder, context_folder, root_folder, static_folder, out_dir, seed: int = 123):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
     for title, context, content, questions, answers, static_lesson in tqdm(data):
-        msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, n_turn, aggregate_answers, provide_lesson)
+        msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, 
+                                                n_turn, aggregate_answers, provide_lesson, seed)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
@@ -164,7 +170,8 @@ if __name__ == '__main__':
     parser.add_argument("--static-folder", required=True)
     parser.add_argument("--root-folder", required=True)
     parser.add_argument("--output-folder", required=True)
+    parser.add_argument("--seed", type=int, default=123)
 
     args = parser.parse_args()
     print(args.static_folder)
-    run(args.context, args.num_turns, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
+    run(args.context, args.num_turns, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed)
