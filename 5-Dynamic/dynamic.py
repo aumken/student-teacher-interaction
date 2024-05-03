@@ -212,6 +212,8 @@ def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, qu
     results = []
 
     for title, context, content, questions, answers, static_lesson in tqdm(data):
+        if len(answers) == 0:
+            continue
         msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, 
                                                 n_turn, refine_questions, aggregate_answers, provide_lesson, seed)
         for i, output in enumerate(outputs):
