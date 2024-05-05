@@ -43,6 +43,7 @@ def get_all_data(context, context_folder, questions_folder, answers_folder, stat
         for file in files:
             context, content = process_file(context, os.path.join(root, file))
 
+            file = file.replace('.pdf', '.md') if context == 'academic_papers' else file
             static_path = os.path.join(root.replace(context_folder, static_folder), f'static_{file}')
             _, static_lesson = process_file(context, static_path)
 
