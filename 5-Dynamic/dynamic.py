@@ -207,13 +207,17 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
     return msg_history, outputs
 
 def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, questions_folder, 
-        answers_folder, context_folder, root_folder, static_folder, out_dir, seed: int = 123):
+        answers_folder, context_folder, root_folder, static_folder, out_dir, seed: int = 123, results_folder: str = None):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
     for title, context, content, questions, answers, static_lesson in tqdm(data):
+        if results_folder:
+            if os.path.exists(os.path.join(results_folder, f'chat_history_{title}.json')):
+                continue
         if len(answers) == 0:
             continue
+        print(title)
         msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, 
                                                 n_turn, refine_questions, aggregate_answers, provide_lesson, seed)
         for i, output in enumerate(outputs):
@@ -223,7 +227,14 @@ def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, qu
         with open(os.path.join(out_dir, f'chat_history_{title}.json'), 'w') as f:
             json.dump(msg_history, f, indent=4)
     
-    with open(os.path.join(out_dir, f'results.json'), 'w') as f:
+    res_file = os.path.join(out_dir, f'results.json')
+    if results_folder:
+        if os.path.exists(res_file):
+            with open(res_file, 'r') as f:
+                prev_results = json.load(res_file)
+                results.extend(prev_results)
+    
+    with open(res_file, 'w') as f:
         json.dump(results, f, indent=4)
 
 if __name__ == '__main__':
@@ -239,6 +250,7 @@ if __name__ == '__main__':
     parser.add_argument("--static-folder", required=True)
     parser.add_argument("--root-folder", required=True)
     parser.add_argument("--output-folder", required=True)
+    parser.add_argument("--results-folder", required=False)
     parser.add_argument("--seed", type=int, default=123)
 
     args = parser.parse_args()
@@ -246,5 +258,4 @@ if __name__ == '__main__':
     if args.refine_questions:
         nli_model = AutoModelForSeq2SeqLM.from_pretrained('google/t5_xxl_true_nli_mixture', device_map='cuda', torch_dtype=torch.bfloat16)
         nli_tokenizer = AutoTokenizer.from_pretrained('google/t5_xxl_true_nli_mixture')
-    run(args.context, args.num_turns, args.refine_questions, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder)
-    run(args.context, args.num_turns, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed)
+    run(args.context, args.num_turns, args.refine_questions, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed, args.results_folder)
