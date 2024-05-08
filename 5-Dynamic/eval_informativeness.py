@@ -20,7 +20,7 @@ def extract_text_from_pdf(filepath):
                 break  # Stop reading further if 1500 characters have been reached
     return text[:1500]  # Return only the first 1500 characters of the text
 
-def _get_entailment_scores(model, tokenizer, sentences, question):
+def _get_entailment_scores(model, tokenizer, sentences, question, batch_size=16):
     inputs = tokenizer([f"premise: {s} hypothesis: {question}" for s in sentences], 
                         padding=True, truncation=True, return_tensors='pt')['input_ids'].to('cuda:0')
     model.eval()
@@ -28,10 +28,16 @@ def _get_entailment_scores(model, tokenizer, sentences, question):
     non_entailment_idx = tokenizer.convert_tokens_to_ids(['0'])[0]
     indices = [entailment_idx, non_entailment_idx]
     
+    scores = []
     with torch.no_grad():
-        scores = nli_model.generate(inputs, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores[0]
-        scores = torch.nn.functional.softmax(scores[:, indices], dim=0).cpu()
-
+        for i in range(0, inputs.shape[0], 16):
+            batch = inputs[i:i+16, :]
+        batch_scores = nli_model.generate(batch, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores[0]
+        batch_scores = torch.nn.functional.softmax(batch_scores[:, indices], dim=0).cpu()
+        scores.append(batch_scores)
+    
+    scores = torch.vstack(scores)
+    
     return scores
 
 def get_informativeness_per_doc(model, tokenizer, content, questions):
