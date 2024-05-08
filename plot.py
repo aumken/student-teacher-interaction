@@ -50,7 +50,10 @@ def preprocess_static_results(static_results_dir):
         fname = os.path.join(static_results_dir, f'{context}.xlsx')
         df = pd.read_excel(fname, index_col=0)
         scores = list(map(_eval_expr, df['S2 Score'].tolist()))
-        all_static_results += [{'accuracy': s, 'method': 'static', 'context': context, 'turn': t} for s in scores for t in range(0, 5)]
+        all_static_results += [{'accuracy': s, 'method': 'static student', 'context': context, 'turn': t} for s in scores for t in range(0, 5)]
+
+        scores = list(map(_eval_expr, df['T2 Score'].tolist()))
+        all_static_results += [{'accuracy': s, 'method': 'static teacher', 'context': context, 'turn': t} for s in scores for t in range(0, 5)]
     
     return all_static_results
 
@@ -120,7 +123,7 @@ def plot_results(static_results_dir, plain_results_dir, lesson_results_dir, refi
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 8))
     for i, context in enumerate(df['context'].unique()):
         ax = axes[i // 2, i % 2]
-        sns.lineplot(data=df[df['context'] == context], x='turn', y='accuracy', hue='method', marker='o', ax=ax)
+        sns.lineplot(data=df[df['context'] == context], x='turn', y='accuracy', hue='method', marker='o', ax=ax, errorbar=None)
         ax.set_title(f"Context: {context}")
         plt.xticks(np.arange(0, 5, 1))
 
