@@ -81,8 +81,7 @@ def get_informativeness(out_file, chat_directory, content_directory, questions_f
         if role == 'quiz':
             with open(file, 'r') as f:
                 txt = f.read()
-            pattern = re.compile(r"Question [0-9]+: (.+\?)")
-            questions = pattern.findall(txt, re.MULTILINE)
+            questions = re.findall(r"Question [0-9]+: (.+)", txt, re.MULTILINE)
         else:
             with open(file, 'r') as f:
                 chat_history = json.load(f)
