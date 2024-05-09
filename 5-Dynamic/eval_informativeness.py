@@ -7,6 +7,7 @@ import nltk
 import argparse
 import os
 import PyPDF2
+import re
 
 def extract_text_from_pdf(filepath):
     text = ""
