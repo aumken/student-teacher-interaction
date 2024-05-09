@@ -131,15 +131,43 @@ def plot_results(static_results_dir, plain_results_dir, lesson_results_dir, refi
     plt.show()
     plt.savefig(os.path.join(output_dir, 'results.png'), dpi=300)
 
+def plot_information_coverage(info_results_dir, role, output_dir):
+    results = []
+    for file in glob.glob(f'{info_results_dir}/{role}/*.json'):
+        parts = file.replace('.json','').split('/')[-1].split('_')
+        context = '_'.join(parts[1:3])
+        method = '_'.join(parts[3:]) if role != 'quiz' else ''
+
+        with open(file, 'r') as f:
+            res = json.load(f)
+            for doc in res:
+                for i, value in enumerate(res[doc]):
+                    results.append({'information coverage': value, 'number of questions': i+1, 
+                                    'context': context, 'method': method})
+
+    df = pd.DataFrame(results)
+    
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 8))
+    for i, context in enumerate(df['context'].unique()):
+        ax = axes[i // 2, i % 2]
+        sns.lineplot(data=df[df['context'] == context], x='number of questions', y='information coverage', hue='method' if role != 'quiz' else None, marker='o', ax=ax, errorbar=None)
+        ax.set_title(f"Context: {context}")
+
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(os.path.join(output_dir, f'info_results_{role}.png'), dpi=300)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Plot all results")
-    parser.add_argument("--plot", choices=["results", "lengths"], required=True)
+    parser.add_argument("--plot", choices=["results", "lengths", "information"], required=True)
     parser.add_argument("--static-results", help="Static results directory containing xlsx files")
     parser.add_argument("--plain-results", help="Plain results directory containing results.json file")
     parser.add_argument("--lesson-results", help="Lesson-informed results directory containing results.json file")
     parser.add_argument("--refinement-results", help="Refinement results directory containing results.json file")
     parser.add_argument("--static-lessons", help="Directory containing static lessons")
     parser.add_argument("--raw-contents", help="Directory containing raw contents")
+    parser.add_argument("--information-results", help="Information coverage results directory")
+    parser.add_argument("--role", help="Role for information results")
     parser.add_argument("--output", help="Output directory for the plots", required=True)
 
     args = parser.parse_args()
@@ -147,3 +175,5 @@ if __name__ == '__main__':
         plot_results(args.static_results, args.plain_results, args.lesson_results, args.refinement_results, args.static_lessons, args.output)
     elif args.plot == 'lengths':
         plot_lengths(args.static_lessons, args.raw_contents, args.plain_results, args.lesson_results, args.refinement_results, args.output)
+    elif args.plot == 'information':
+        plot_information_coverage(args.information_results, args.role, args.output)
