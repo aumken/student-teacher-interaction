@@ -1,5 +1,5 @@
 import os
-import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from bs4 import BeautifulSoup
@@ -9,32 +9,57 @@ def fetch_movie_plots(base_url, periods, output_dir, small_plots_dir):
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(small_plots_dir, exist_ok=True)
 
-    for year, section_ids in periods:
-        for section_id in section_ids:
-            url = base_url.format(year)
-            soup = make_soup(url)
-            section = soup.find("span", id=section_id).find_next("table")
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for year, section_ids in periods:
+            for section_id in section_ids:
+                url = base_url.format(year)
+                futures.append(
+                    executor.submit(
+                        process_section, url, section_id, output_dir, small_plots_dir
+                    )
+                )
 
+        for future in as_completed(futures):
+            future.result()
+
+
+def process_section(url, section_id, output_dir, small_plots_dir):
+    soup = make_soup(url)
+    try:
+        section = soup.find("span", id=section_id).find_next("table")
+        with ThreadPoolExecutor() as executor:
+            futures = []
             for row in section.find("tbody").find_all("tr"):
                 cells = row.find_all("td")
                 if cells:
                     link = cells[0].find("a") or cells[1].find("a")
                     if link and "href" in link.attrs:
                         movie_title = link.text.strip()
-                        fetch_and_save_plot(
-                            link["href"], movie_title, output_dir, small_plots_dir
+                        futures.append(
+                            executor.submit(
+                                fetch_and_save_plot,
+                                link["href"],
+                                movie_title,
+                                output_dir,
+                                small_plots_dir,
+                            )
                         )
+
+            for future in as_completed(futures):
+                future.result()
+    except AttributeError:
+        print(f"Skipping section {section_id} due to missing table.")
 
 
 def make_soup(url):
     response = requests.get(url)
-    return BeautifulSoup(response.content, "html.parser")
+    return BeautifulSoup(response.content, "lxml")
 
 
 def fetch_and_save_plot(relative_url, movie_title, output_dir, small_plots_dir):
     movie_url = f"https://en.wikipedia.org{relative_url}"
     movie_soup = make_soup(movie_url)
-
     try:
         plot_text = extract_plot_text(movie_soup)
         if plot_text:
@@ -66,10 +91,9 @@ if __name__ == "__main__":
     base_url = "https://en.wikipedia.org/wiki/List_of_American_films_of_{}"
     periods = [
         ("2024", ["January–March"]),
-        ("2023", ["July–September", "October–December"]),
+        ("2023", ["April-June", "July–September", "October–December"]),
     ]
     output_dir = "a_files/movie_plots"
     small_plots_dir = "a_files/movie_plots_small"
     fetch_movie_plots(base_url, periods, output_dir, small_plots_dir)
-
     print("Scraping complete!")
