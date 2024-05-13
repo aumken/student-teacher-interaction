@@ -190,7 +190,6 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
 def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, aggregate_answers=False, provide_lesson=False, seed:int = 123):    
     msg_history = [{"role": "teacher", 
                     "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
-                    (f"Here is a brief summary of the {context.replace('_', ' ')}: {get_brief_summary_from_teacher(context, content)}\n" if refine_questions else "") +
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
     
     outputs = []
@@ -199,7 +198,6 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
         outputs.append((student_quiz_answers, acc))
         #chat_summary = ' '.join([msg['content'] for msg in msg_history if msg['role'] == 'teacher'])
         q =  get_refined_question_from_student(context, msg_history, static, seed) if refine_questions else get_question_from_student(context, msg_history, seed)
-        q = get_question_from_student(context, msg_history, seed)
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
