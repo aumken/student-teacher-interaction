@@ -141,33 +141,18 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
     while answer_list is None:
         if num_trials > 2:
             break
-        if aggregate_answers:
-            #summary = ' '.join([msg["content"][:-len(QUESTION_SENTENCE)] for msg in message_history if msg["role"] == "teacher"])
-            summary = extract_summary_from_chat(message_history, context).replace('\n', ' ')
-            print(f"{summary}\n-------------")
-
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                seed=seed,
-                temperature=0.0,
-                messages=[{"role": "system",
-                        "content": f"You will be given a brief summary of a {context} and a set of 10 multiple-choice questions based on it. "
-                                        "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                                        f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n Summary: {summary}\n",
-                            }, {"role": "user", "content": questions}])
-        else:
-            new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
-                                            "content": x["content"]}, message_history))
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                seed=seed,
-                temperature=0.0,
-                messages=new_history + [{"role": "system",
-                        "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
-                        "Answer questions based on the information you inferred from previous conversation. "
-                        "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                        f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
-                        }, {"role": "user", "content": questions}])
+        new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
+                                        "content": x["content"]}, message_history))
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo" if context != "images" else "gpt-4o",
+            seed=seed,
+            temperature=0.0,
+            messages=new_history + [{"role": "system",
+                    "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
+                    "Answer questions based on the information you inferred from previous conversation. "
+                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
+                    f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
+                    }, {"role": "user", "content": questions}])
         
         raw_answers = response.choices[0].message.content.strip()
 
