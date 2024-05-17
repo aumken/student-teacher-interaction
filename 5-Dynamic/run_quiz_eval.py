@@ -5,7 +5,7 @@ import json
 import os
 from dynamic import eval_student, TEACHER_INSTRUCTIONS
 
-def run(context, chat_folder, question_folder, answer_folder, aggregate_answers, seed):
+def run(context, chat_folder, question_folder, answer_folder, seed):
     def _read_file(fname):
         with open(fname, "r") as f:
             return f.read()
@@ -24,7 +24,7 @@ def run(context, chat_folder, question_folder, answer_folder, aggregate_answers,
             chat_history = json.load(f)
         
         for i in range(1, len(chat_history) + 1, 2):
-            student_answers, acc = eval_student(context, questions, chat_history[:i], true_answers, i, aggregate_answers, seed)
+            student_answers, acc = eval_student(context, questions, chat_history[:i], true_answers, i, seed)
             results.append({'title': title, 'context': context, 'true_answer': true_answers, 'answers': student_answers, 
                             'accuracy': acc, 'turn': (i-1)//2})
 
@@ -37,7 +37,6 @@ def run(context, chat_folder, question_folder, answer_folder, aggregate_answers,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Set up dynamic conversation between student and teacher')
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
-    parser.add_argument("--aggregate-answers", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=True)
     parser.add_argument("--questions-folder", required=True)
     parser.add_argument("--results-folder", required=True)

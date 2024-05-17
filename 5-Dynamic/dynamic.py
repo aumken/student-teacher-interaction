@@ -135,7 +135,7 @@ def extract_summary_from_chat(message_history, context, seed: int = 123):
 
     return response.choices[0].message.content.strip()
 
-def eval_student(context, questions, message_history, true_answers, n_turn, aggregate_answers = False, seed: int = 123):
+def eval_student(context, questions, message_history, true_answers, n_turn, seed: int = 123):
     answer_list = None
     num_trials = 0
     while answer_list is None:
@@ -174,13 +174,13 @@ def eval_student(context, questions, message_history, true_answers, n_turn, aggr
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, aggregate_answers=False, provide_lesson=False, seed:int = 123):    
+def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, provide_lesson=False, seed:int = 123):    
     msg_history = [{"role": "teacher", 
                     "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
     
     outputs = []
-    student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, 0, aggregate_answers, seed)
+    student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, 0, seed)
     outputs.append((student_quiz_answers, acc))
     
     for i in range(1, n_turn + 1):
@@ -189,13 +189,13 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
-        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers, seed)
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, seed)
         outputs.append((student_quiz_answers, acc))
 
     return msg_history, outputs
 
-def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, questions_folder, 
-        answers_folder, context_folder, root_folder, static_folder, out_dir, seed: int = 123, results_folder: str = None):
+def run(context, n_turn, refine_questions, provide_lesson, questions_folder, answers_folder, 
+        context_folder, root_folder, static_folder, out_dir, seed: int = 123, results_folder: str = None):
     data = get_all_data(context, context_folder, questions_folder, answers_folder, static_folder, root_folder)
     results = []
 
@@ -207,7 +207,7 @@ def run(context, n_turn, refine_questions, aggregate_answers, provide_lesson, qu
             continue
         print(title)
         msg_history, outputs = run_conversation(context, content, questions, answers, static_lesson, out_dir, 
-                                                n_turn, refine_questions, aggregate_answers, provide_lesson, seed)
+                                                n_turn, refine_questions, provide_lesson, seed)
         for i, output in enumerate(outputs):
             student_answers, acc = output
             results.append({'title': title, 'context': context, 'true_answer': answers, 'answers': student_answers, 
@@ -229,7 +229,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Set up dynamic conversation between student and teacher')
     parser.add_argument("--context", choices=list(TEACHER_INSTRUCTIONS.keys()), required=True)
     parser.add_argument("--num-turns", type=int, default=10, required=False)
-    parser.add_argument("--aggregate-answers", action='store_true', required=False)
     parser.add_argument("--refine-questions", action='store_true', required=False)
     parser.add_argument("--provide-lesson", action='store_true', required=False)
     parser.add_argument("--answers-folder", required=False)
@@ -246,4 +245,4 @@ if __name__ == '__main__':
     if args.refine_questions:
         nli_model = AutoModelForSeq2SeqLM.from_pretrained('google/t5_xxl_true_nli_mixture', device_map='cuda', torch_dtype=torch.bfloat16)
         nli_tokenizer = AutoTokenizer.from_pretrained('google/t5_xxl_true_nli_mixture')
-    run(args.context, args.num_turns, args.refine_questions, args.aggregate_answers, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed, args.results_folder)
+    run(args.context, args.num_turns, args.refine_questions, args.provide_lesson, args.questions_folder, args.answers_folder, args.context_folder, args.root_folder, args.static_folder, args.output_folder, args.seed, args.results_folder)
