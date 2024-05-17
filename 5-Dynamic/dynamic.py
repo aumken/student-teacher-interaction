@@ -195,14 +195,17 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
                     f"You can ask me any question about the {context.replace('_', ' ')}."}]
     
     outputs = []
-    for i in range(n_turn):
-        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers, seed)
-        outputs.append((student_quiz_answers, acc))
+    student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, 0, aggregate_answers, seed)
+    outputs.append((student_quiz_answers, acc))
+    
+    for i in range(1, n_turn + 1):
         #chat_summary = ' '.join([msg['content'] for msg in msg_history if msg['role'] == 'teacher'])
         q =  get_refined_question_from_student(context, msg_history, static, seed) if refine_questions else get_question_from_student(context, msg_history, seed)
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, aggregate_answers, seed)
+        outputs.append((student_quiz_answers, acc))
 
     return msg_history, outputs
 
