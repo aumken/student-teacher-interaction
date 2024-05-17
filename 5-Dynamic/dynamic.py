@@ -109,32 +109,6 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
     min_idx = torch.argmin(torch.tensor(q_scores)).item()
     return questions[min_idx]
 
-def get_brief_summary_from_teacher(context, content, seed: int = 123):
-    instruction = f"Could you provide a brief summary of the following {context.replace('_', ' ')}? Content: {content}"
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo", 
-        messages=[{"role": "system", "content": instruction}],
-        seed=seed)
-    
-    response = response.choices[0].message.content
-
-    return response
-
-def extract_summary_from_chat(message_history, context, seed: int = 123):
-    if len(message_history) == 0:
-        return ""
-    new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
-                                          "content": x["content"]}, message_history))
-    response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=new_history + [{"role": "system",
-                       "content": f"Based on this conversation, generate a comprehensive summary about the topic. "
-                       "Include all the important points so that a student can answer wide range of related questions on this topic."
-                        }],
-            seed=seed)
-
-    return response.choices[0].message.content.strip()
-
 def eval_student(context, questions, message_history, true_answers, n_turn, seed: int = 123):
     answer_list = None
     num_trials = 0
