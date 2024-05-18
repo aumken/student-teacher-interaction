@@ -31,6 +31,7 @@ async def get_model_answers(questions, static_info, context, max_retries=3):
             response = await client.chat.completions.create(
                 model=model,
                 seed=123,
+                temperature=0,
                 messages=[
                     {
                         "role": "system",
