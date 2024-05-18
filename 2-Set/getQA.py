@@ -26,7 +26,7 @@ async def generate_description_from_image(image_path, max_retries=5, expected_co
     while retries < max_retries:
         try:
             response = await client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "user",

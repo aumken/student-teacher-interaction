@@ -47,6 +47,7 @@ async def generate_static(context, plot):
         response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             seed=123,
+            temperature=0,
             messages=[
                 {"role": "system", "content": inst},
                 {"role": "user", "content": plot},
@@ -77,20 +78,23 @@ async def generate_description_from_image(context, image_path):
 
     try:
         response = await client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-4o",
             seed=123,
+            temperature=0,
             messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": inst},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ],
-            },
-        ],
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": inst},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                },
+            ],
         )
         static_content = response.choices[0].message.content
         return static_content

@@ -43,7 +43,7 @@ def extract_text_from_pdf(filepath):
 async def get_model_answers(
     questions, original_info, static_info, context, max_retries=3
 ):
-    model = "gpt-4-turbo" if context == "images" else "gpt-3.5-turbo"
+    model = "gpt-4o" if context == "images" else "gpt-3.5-turbo"
     expected_answers = 5 if context == "images" else 10
     retries = 0
     while retries < max_retries:
@@ -51,6 +51,7 @@ async def get_model_answers(
             response = await client.chat.completions.create(
                 model=model,
                 seed=123,
+                temperature=0,
                 messages=[
                     {
                         "role": "system",
@@ -102,8 +103,9 @@ async def get_image_answers(questions, image_path, static_info, max_retries=3):
     while retries < max_retries:
         try:
             response = await client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4o",
                 seed=123,
+                temperature=0,
                 messages=[
                     {
                         "role": "system",
@@ -118,7 +120,13 @@ async def get_image_answers(questions, image_path, static_info, max_retries=3):
                                 f"1) A\n2) B\n3) C\n...\n\n"
                                 f"You must provide exactly {expected_answers} answers, one for each question, and use only the specified formats.\n\n"
                                 f"Lesson: {static_info}\n",
-                            },
+                            }
+                        ],
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": questions},
                             {
                                 "type": "image_url",
                                 "image_url": {
@@ -127,7 +135,6 @@ async def get_image_answers(questions, image_path, static_info, max_retries=3):
                             },
                         ],
                     },
-                    {"role": "user", "content": questions},
                 ],
             )
             raw_answers = response.choices[0].message.content.strip()

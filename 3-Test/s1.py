@@ -1,4 +1,4 @@
-#s1.py
+# s1.py
 import asyncio
 import os
 import re
@@ -23,7 +23,7 @@ dot_pattern = re.compile(r"^\d+\.\s*([A-D])\s*$", re.MULTILINE)
 
 
 async def get_model_answers(questions, context, max_retries=3):
-    model = "gpt-4-turbo" if context == "images" else "gpt-3.5-turbo"
+    model = "gpt-4o" if context == "images" else "gpt-3.5-turbo"
     expected_answers = 5 if context == "images" else 10
     retries = 0
     while retries < max_retries:
@@ -31,6 +31,7 @@ async def get_model_answers(questions, context, max_retries=3):
             response = await client.chat.completions.create(
                 model=model,
                 seed=123,
+                temperature=0,
                 messages=[
                     {
                         "role": "system",
@@ -108,16 +109,11 @@ async def process_directory(context, questions_dir, answers_dir):
 
 
 async def main(questions_base_dir, answers_base_dir):
-    tasks = []
     for context in os.listdir(questions_base_dir):
         context_questions_dir = questions_base_dir / context
         if context_questions_dir.is_dir():
             context_answers_dir = answers_base_dir / context
-            task = asyncio.create_task(
-                process_directory(context, context_questions_dir, context_answers_dir)
-            )
-            tasks.append(task)
-    await asyncio.gather(*tasks)
+            await process_directory(context, context_questions_dir, context_answers_dir)
 
 
 if __name__ == "__main__":
