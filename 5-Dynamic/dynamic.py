@@ -109,7 +109,7 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
     min_idx = torch.argmin(torch.tensor(q_scores)).item()
     return questions[min_idx]
 
-def eval_student(context, questions, message_history, true_answers, n_turn, seed: int = 123):
+def eval_student(context, questions, message_history, true_answers, n_turn, provide_lesson: bool = False, seed: int = 123):
     answer_list = None
     num_trials = 0
     while answer_list is None:
@@ -117,11 +117,28 @@ def eval_student(context, questions, message_history, true_answers, n_turn, seed
             break
         new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                         "content": x["content"]}, message_history))
+        additional_system_msg = []
+
+        if provide_lesson:
+            # Here is the extensive summary of the <context>: <LESSON>\n....
+            txt = ':'.join(new_history[0]["content"].split(':')[1:])
+            lesson = '\n'.join(txt.split('\n')[:-1])
+            print(f"lesson: {lesson}")
+
+            # remove lesson from chat history
+            print(f"new history first msg content: {new_history[0]['content']}")
+            new_history[0]["content"] = new_history[0]["content"].split('\n')[-1]
+            additional_system_msg.append({"role": "system", 
+                                          "content": f"You will be given a lesson on a specific topic. Please review the lesson carefully.\nLesson:{lesson}\n"
+                                          })
+            print(f"new_history new: {new_history}")
+            print(f"additional: {additional_system_msg}")
+
         response = client.chat.completions.create(
             model="gpt-3.5-turbo" if context != "images" else "gpt-4o",
             seed=seed,
             temperature=0.0,
-            messages=new_history + [{"role": "system",
+            messages=additional_system_msg + new_history + [{"role": "system",
                     "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
                     "Answer questions based on the information you inferred from previous conversation. "
                     "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
@@ -148,13 +165,13 @@ def eval_student(context, questions, message_history, true_answers, n_turn, seed
     acc = sum(map(lambda x: x[0] == x[1], zip(answer_list, true_answers))) / len(true_answers)
     return answer_list, acc
 
-def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, provide_lesson=False, seed:int = 123):    
+def run_conversation(context, content, questions, true_answers, static, out_dir, n_turn: int = 10, refine_questions=False, provide_lesson=False, seed:int = 123):
+    lesson_txt = f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else ""
     msg_history = [{"role": "teacher", 
-                    "content": f"Here is the extensive summary of the {context.replace('_', ' ')}: {static}\n" if provide_lesson else "" +
-                    f"You can ask me any question about the {context.replace('_', ' ')}."}]
+                    "content":  lesson_txt + f"You can ask me any question about the {context.replace('_', ' ')}."}]
     
     outputs = []
-    student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, 0, seed)
+    student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, 0, provide_lesson, seed)
     outputs.append((student_quiz_answers, acc))
     
     for i in range(1, n_turn + 1):
@@ -163,7 +180,7 @@ def run_conversation(context, content, questions, true_answers, static, out_dir,
         msg_history.append({"role": "student", "content": q})
         answer = get_answer_from_teacher(context, content, msg_history, seed)
         msg_history.append({"role": "teacher", "content": answer + QUESTION_SENTENCE})
-        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, seed)
+        student_quiz_answers, acc = eval_student(context, questions, msg_history, true_answers, i, provide_lesson, seed)
         outputs.append((student_quiz_answers, acc))
 
     return msg_history, outputs
