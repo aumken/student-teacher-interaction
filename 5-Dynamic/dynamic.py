@@ -10,6 +10,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM
 import torch
 import nltk
+import random
 
 nltk.data.path.append('.')
 
@@ -112,6 +113,8 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
 def eval_student(context, questions, message_history, true_answers, n_turn, provide_lesson: bool = False, seed: int = 123):
     answer_list = None
     num_trials = 0
+    random.seed(seed)
+    seeds = [random.randint(0, 1000) for i in range(10)]
     while answer_list is None:
         if num_trials > 2:
             break
@@ -126,36 +129,42 @@ def eval_student(context, questions, message_history, true_answers, n_turn, prov
             print(f"lesson: {lesson}")
 
             # remove lesson from chat history
-            print(f"new history first msg content: {new_history[0]['content']}")
             new_history[0]["content"] = new_history[0]["content"].split('\n')[-1]
             additional_system_msg.append({"role": "system", 
                                           "content": f"You will be given a lesson on a specific topic. Please review the lesson carefully.\nLesson:{lesson}\n"
                                           })
-            print(f"new_history new: {new_history}")
-            print(f"additional: {additional_system_msg}")
 
+        expected_answers = 5 if context == "images" else 10
         response = client.chat.completions.create(
             model="gpt-3.5-turbo" if context != "images" else "gpt-4o",
-            seed=seed,
+            seed=seeds.pop(),
             temperature=0.0,
             messages=additional_system_msg + new_history + [{"role": "system",
-                    "content": f"You will be given a set of 10 multiple-choice questions based on a {context} you previously discussed. "
-                    "Answer questions based on the information you inferred from previous conversation. "
-                    "Please provide your answers in a single string, with each character representing your choice for the corresponding question, "
-                    f"or list them numerically. For example: 'ABCDABCDAB' or '1) A 2) B 3) C ...'.\n\n",
+                    "content": f"You will be given a set of {expected_answers} multiple-choice questions regarding a {context}. "
+                            f"Please provide your answers in the following format:\n\n"
+                            f"1. A single string of {expected_answers} capital letters (A, B, C, or D) representing your choices for each question. For example: ABCDABCDAB\n\n"
+                            f"OR\n\n"
+                            f"2. A numbered list with the question number followed by a closing parenthesis or a dot, a space, and then the capital letter (A, B, C, or D) representing your choice. For example:\n"
+                            f"1) A\n2) B\n3) C\n...\n\n"
+                            f"Even if you feel you lack context, make an educated guess for each answer. You must provide exactly {expected_answers} answers, one for each question, and use only the specified formats."
+                            f"Based on the discussion, please answer the following questions to evaluate your understanding.",
                     }, {"role": "user", "content": questions}])
         
         raw_answers = response.choices[0].message.content.strip()
 
-        continuous_pattern = re.compile(r"\b[A-D]{10}\b")
-        listed_pattern = re.compile(r"\b\d+[).]?\s*([A-D])")
+        # Precompiled regex patterns
+        continuous_pattern = re.compile(r"^[A-D]+$", re.MULTILINE)
+        listed_pattern = re.compile(r"^\d+\)\s*([A-D])\s*$", re.MULTILINE)
+        dot_pattern = re.compile(r"^\d+\.\s*([A-D])\s*$", re.MULTILINE)
 
         continuous_match = continuous_pattern.search(raw_answers)
         if continuous_match:
             answer_list = continuous_match.group()
         else:
-            listed_matches = listed_pattern.findall(raw_answers)
-            answer_list = "".join(listed_matches) if len(listed_matches) == 10 else None
+            # Combine listed and dot patterns
+            listed_matches = listed_pattern.findall(raw_answers) + dot_pattern.findall(raw_answers)
+            if len(listed_matches) == expected_answers:
+                answer_list = "".join(match.strip() for match in listed_matches)
         
         num_trials += 1
 
