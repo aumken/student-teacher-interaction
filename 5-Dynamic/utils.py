@@ -1,6 +1,7 @@
 import os
 import PyPDF2
 from pathlib import Path
+import base64
 
 def extract_text_from_pdf(filepath):
     text = ""
@@ -14,10 +15,16 @@ def extract_text_from_pdf(filepath):
                 break  # Stop reading further if 1500 characters have been reached
     return text[:1500]  # Return only the first 1500 characters of the text
 
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
 def process_file(context, filepath,):
     # Extract text from PDF or read from Markdown file
     if filepath.endswith(".pdf"):
         plot = extract_text_from_pdf(filepath)
+    elif filepath.endswith(".jpg"):
+        plot = encode_image(filepath)
     else:
         with open(filepath, "r") as file:
             plot = file.read()
@@ -43,7 +50,11 @@ def get_all_data(context, context_folder, questions_folder, answers_folder, stat
         for file in files:
             context, content = process_file(context, os.path.join(root, file))
 
-            file = file.replace('.pdf', '.md') if context == 'academic_papers' else file
+            if context == 'academic_papers':
+                file = file.replace('.pdf', '.md')
+            elif context == 'images':
+                file = file.replace('.jpg', '.md')
+            
             static_path = os.path.join(root.replace(context_folder, static_folder), f'static_{file}')
             _, static_lesson = process_file(context, static_path)
 
