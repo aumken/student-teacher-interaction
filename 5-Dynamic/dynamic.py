@@ -128,7 +128,7 @@ def eval_student(context, questions, message_history, true_answers, n_turn, prov
     random.seed(seed)
     seeds = [random.randint(0, 1000) for i in range(10)]
     while answer_list is None:
-        if num_trials > 2:
+        if num_trials > 9:
             break
         new_history = list(map(lambda x: {"role": "user" if x["role"] == "teacher" else "assistant", 
                                         "content": x["content"]}, message_history))
