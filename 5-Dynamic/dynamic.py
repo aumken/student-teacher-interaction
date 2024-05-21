@@ -16,7 +16,7 @@ nltk.data.path.append('.')
 
 TEACHER_INSTRUCTIONS = {
     "movie_plots": "Prepare the student comprehensively for any quiz on this movie plot, by answering questions on its storyline, character arcs, themes, and significant scenes. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers! Include specific event and character-related details in your answers like what happened, who performed specific actions, and who was involved.",
-    "image": "Prepare the student comprehensively for any quiz on this image, by answering questions on its elements, composition, and context. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers!",
+    "images": "Prepare the student comprehensively for any quiz on this image, by answering questions on its elements, composition, and context. Do not ask any questions to the student, only answer the questions! Generate long and detailed answers!",
     "academic_papers": "Prepare the student comprehensively for any quiz on this academic paper, by answering questions on its objectives, methodology, findings, and significance. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers!",
     "news_articles": "Prepare the student comprehensively for any quiz on this news article, by answering questions on the main events, key figures, and the article's context. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers! Include specific event-related details in your answers like what happened, who performed specific actions, and who was involved.",
     "song_lyrics": "Prepare the student comprehensively for any quiz on this movie plot, by answering questions on the narrative, themes, and expressive techniques used. Content: {content}\n Do not ask any questions to the student, only answer the questions! Generate long and detailed answers!",
@@ -24,7 +24,7 @@ TEACHER_INSTRUCTIONS = {
 
 STUDENT_INSTRUCTIONS = {
     "movie_plots": "To learn more about the movie plot known only to the teacher and get prepared for any quiz on that, ask questions on its storyline, character arcs, themes, and significant scenes. Ask diverse questions encompassing plot progression, character actions, involvement, thematic exploration, and character motivations. Include questions seeking specific details such as character names, objects, settings, and dates. Include questions that prompt thorough analysis of the plot and a deeper comprehension of its unfolding events. Ensure questions are diverse and comprehensive, covering all facets of the movie. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
-    "image": "To learn more about the image known only to the teacher and get prepared for any quiz on that, ask questions on its elements, composition, and context. Ask diverse questions encompassing symbolism, meaning, theme and actions depicted in the image. Include questions seeking specific details such as presence and placement of objects. Include questions that prompt thorough analysis of the image. Ensure questions are diverse and comprehensive, covering all facets of the image. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
+    "images": "To learn more about the image known only to the teacher and get prepared for any quiz on that, ask questions on its elements, composition, and context. Ask diverse questions encompassing symbolism, meaning, theme and actions depicted in the image. Include questions seeking specific details such as presence and placement of objects. Include questions that prompt thorough analysis of the image. Ensure questions are diverse and comprehensive, covering all facets of the image. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
     "academic_papers": "To learn more about the academic paper known only to the teacher and get prepared for any quiz on that, ask questions on its objectives, methodology, findings, and significance. Ask diverse questions encompassing experiments, its relation to prior studies, limitations, motivation and key takeaways. Include questions seeking specific details such as experimental setup. Include questions that prompt thorough analysis of the paper and a deeper understanding of its broader contributions. Ensure questions are diverse and comprehensive, covering all aspects of the paper. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
     "news_articles": "To learn more about the news article known only to the teacher and get prepared for any quiz on that, ask questions on the main events, key figures, and the article's context. Ask diverse questions encompassing background stories and broader implications. Include questions seeking specific details such as names of individuals, events, actions, and dates. Include questions that prompt thorough analysis of the article and a deeper comprehension of unfolding events. Ensure questions are diverse and comprehensive, covering all aspects of the article. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
     "song_lyrics": "To learn more about song lyrics known only to the teacher knows about and get prepared for any quiz on that, ask questions on its narrative, themes, and expressive techniques used. Ask diverse questions encompassing emotions, individuals, events, involvement, themes and references to other content. Include questions that prompt thorough analysis of the lyrics and a deeper comprehension of its meaning. Ensure questions are diverse and comprehensive, covering all facets of the lyrics. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! Ask one question at a time! NEVER PROMPT TEACHER TO ASK ANY QUESTION!",
@@ -32,7 +32,7 @@ STUDENT_INSTRUCTIONS = {
 
 STUDENT_INSTRUCTIONS_MQ = {
     "movie_plots": "To learn more about the movie plot known only to the teacher and get prepared for any quiz on that, ask questions on its storyline, character arcs, themes, and significant scenes. Each time pose an array of diverse questions encompassing plot progression, character actions, involvement, thematic exploration, and character motivations. Include questions seeking specific details such as character names, objects, settings, and dates. Include questions that prompt thorough analysis of the plot and a deeper comprehension of its unfolding events. Ensure questions are diverse and comprehensive, covering all facets of the movie. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
-    "image": "To learn more about the image known only to the teacher and get prepared for any quiz on that, ask questions on its elements, composition, and context. Each time pose an array of diverse questions encompassing symbolism, meaning, theme and actions depicted in the image. Include questions seeking specific details such as presence and placement of objects. Include questions that prompt thorough analysis of the image. Ensure questions are diverse and comprehensive, covering all facets of the image. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
+    "images": "To learn more about the image known only to the teacher and get prepared for any quiz on that, ask questions on its elements, composition, and context. Each time pose an array of diverse questions encompassing symbolism, meaning, theme and actions depicted in the image. Include questions seeking specific details such as presence and placement of objects. Include questions that prompt thorough analysis of the image. Ensure questions are diverse and comprehensive, covering all facets of the image. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
     "academic_papers": "To learn more about the academic paper known only to the teacher and get prepared for any quiz on that, ask questions on its objectives, methodology, findings, and significance. Each time pose an array of diverse questions encompassing experiments, its relation to prior studies, limitations, motivation and key takeaways. Include questions seeking specific details such as experimental setup. Include questions that prompt thorough analysis of the paper and a deeper understanding of its broader contributions. Ensure questions are diverse and comprehensive, covering all aspects of the paper. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
     "news_articles": "To learn more about the news article known only to the teacher and get prepared for any quiz on that, ask questions on the main events, key figures, and the article's context. Each time pose an array of diverse questions encompassing background stories and broader implications. Include questions seeking specific details such as names of individuals, events, actions, and dates. Include questions that prompt thorough analysis of the article and a deeper comprehension of unfolding events. Ensure questions are diverse and comprehensive, covering all aspects of the article. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
     "song_lyrics": "To learn more about song lyrics known only to the teacher knows about and get prepared for any quiz on that, ask questions on its narrative, themes, and expressive techniques used. Each time pose an array of diverse questions encompassing emotions, individuals, events, involvement, themes and references to other content. Include questions that prompt thorough analysis of the lyrics and a deeper comprehension of its meaning. Ensure questions are diverse and comprehensive, covering all facets of the lyrics. Also, feel free to ask detailed questions whenever necessary. If you run out of questions, always think of and come up with more creative and detailed questions! NEVER PROMPT TEACHER TO ASK ANY QUESTION! Pose multiple questions simultaneously, EACH ON A NEW LINE. Do not output anything than questions!",
@@ -48,11 +48,23 @@ def get_answer_from_teacher(context: str, content: str, message_history: List[Di
     # to obtan answer from teacher, treat teacher as assistant and student as user
     new_history = list(map(lambda x: {"role": "user" if x["role"] == "student" else "assistant", 
                                           "content": x["content"]}, message_history))
-    instruction = TEACHER_INSTRUCTIONS[context].format(content=content)
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo", 
-        messages=[{"role": "system", "content": instruction}] + new_history,
-        seed=seed)
+    if context == 'images':
+        instruction = TEACHER_INSTRUCTIONS[context]
+        response = client.chat.completions.create(
+            model="gpt-4o", 
+            messages=[{"role": "system", "content": instruction},
+                       {"role": "user", "content": [{"type": "image_url", 
+                                                    "image_url": {"url": f"data:image/jpeg;base64,{content}"},
+                                                    }]
+                       },
+                      ] + new_history,
+            seed=seed)
+    else:
+        instruction = TEACHER_INSTRUCTIONS[context].format(content=content)
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo", 
+            messages=[{"role": "system", "content": instruction}] + new_history,
+            seed=seed)
     teacher_response = response.choices[0].message.content
 
     return teacher_response
@@ -64,7 +76,7 @@ def get_question_from_student(context, message_history, seed: int = 123):
 
     instruction = STUDENT_INSTRUCTIONS[context]
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo", 
+        model="gpt-3.5-turbo" if context != "images" else "gpt-4o",
         messages=[{"role": "system", "content": instruction}] + new_history,
         seed=seed)
     student_response = response.choices[0].message.content
@@ -94,7 +106,7 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
 
     instruction = STUDENT_INSTRUCTIONS_MQ[context]
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo", 
+        model="gpt-3.5-turbo" if context != "images" else "gpt-4o", 
         messages=new_history + [{"role": "user", "content": instruction}],
         seed=seed)
     student_response = response.choices[0].message.content
