@@ -41,8 +41,9 @@ def _get_entailment_scores(model, tokenizer, sentences, question, batch_size=16)
     
     return scores
 
-def get_informativeness_per_doc(model, tokenizer, content, questions):
-    doc_sentences =  nltk.sent_tokenize(content)
+def get_informativeness_per_doc(model, tokenizer, content, questions, split_by_newlines=False):
+    # TO DO: split_by_newlines just used for song_lyrics make it an argument or infer context type somehow
+    doc_sentences =  content.split('\n') if split_by_newlines else nltk.sent_tokenize(content)
     all_scores = []
     informativeness_per_doc = []
     # aggregated informativenss: max_i(q_i, doc)
