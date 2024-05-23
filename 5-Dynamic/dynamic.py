@@ -138,7 +138,6 @@ def eval_student(context, questions, message_history, true_answers, n_turn, prov
             # Here is the extensive summary of the <context>: <LESSON>\n....
             txt = ':'.join(new_history[0]["content"].split(':')[1:])
             lesson = '\n'.join(txt.split('\n')[:-1])
-            print(f"lesson: {lesson}")
 
             # remove lesson from chat history
             new_history[0]["content"] = new_history[0]["content"].split('\n')[-1]
