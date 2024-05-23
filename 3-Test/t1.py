@@ -9,7 +9,7 @@ import aiofiles
 import pdfplumber
 import PyPDF2
 import requests
-from dotenv import load_dotenv
+import random
 from openai import AsyncOpenAI
 from pdfminer.psparser import PSEOF
 
@@ -40,15 +40,17 @@ def extract_text_from_pdf(filepath):
     return text[:1500]
 
 
-async def get_model_answers(questions, original_info, context, max_retries=3):
+async def get_model_answers(questions, original_info, context, max_retries=3, seed=123):
     model = "gpt-4o" if context == "images" else "gpt-3.5-turbo"
     expected_answers = 5 if context == "images" else 10
     retries = 0
+    random.seed(seed)
+    seeds = [random.randint(0, 1000) for i in range(10)]
     while retries < max_retries:
         try:
             response = await client.chat.completions.create(
                 model=model,
-                seed=123,
+                seed=seeds.pop(),
                 temperature=0,
                 messages=[
                     {
@@ -93,15 +95,17 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
-async def get_image_answers(questions, image_path, max_retries=3):
+async def get_image_answers(questions, image_path, max_retries=10, seed=123):
     base64_image = encode_image(image_path)
     expected_answers = 5
     retries = 0
+    random.seed(seed)
+    seeds = [random.randint(0, 1000) for i in range(10)]
     while retries < max_retries:
         try:
             response = await client.chat.completions.create(
                 model="gpt-4o",
-                seed=123,
+                seed=seeds.pop(),
                 temperature=0,
                 messages=[
                     {

@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import aiofiles
+import random
 import ujson
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -22,15 +23,17 @@ listed_pattern = re.compile(r"^\d+\)\s*([A-D])\s*$", re.MULTILINE)
 dot_pattern = re.compile(r"^\d+\.\s*([A-D])\s*$", re.MULTILINE)
 
 
-async def get_model_answers(questions, context, max_retries=3):
+async def get_model_answers(questions, context, max_retries=3, seed=123):
     model = "gpt-4o" if context == "images" else "gpt-3.5-turbo"
     expected_answers = 5 if context == "images" else 10
     retries = 0
+    random.seed(seed)
+    seeds = [random.randint(0, 1000) for i in range(10)]
     while retries < max_retries:
         try:
             response = await client.chat.completions.create(
                 model=model,
-                seed=123,
+                seed=seeds.pop(),
                 temperature=0,
                 messages=[
                     {
