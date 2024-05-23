@@ -6,20 +6,23 @@ import torch
 import nltk
 import argparse
 import os
-import PyPDF2
+import pdfplumber
+from pdfminer.psparser import PSEOF
 import re
+
+nltk.data.path.append('.')
 
 def extract_text_from_pdf(filepath):
     text = ""
-    with open(filepath, "rb") as file:
-        pdf = PyPDF2.PdfReader(file)
-        for page_num in range(len(pdf.pages)):
-            text += pdf.pages[page_num].extract_text()
-            if (
-                len(text) >= 1500
-            ):  # Check if the accumulated text has reached 1500 characters
-                break  # Stop reading further if 1500 characters have been reached
-    return text[:1500]  # Return only the first 1500 characters of the text
+    try:
+        with pdfplumber.open(filepath) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text()
+                if len(text) >= 1500:
+                    break
+    except PSEOF:  # Catch the PSEOF exception
+        pass  # Continue to the next line
+    return text[:1500]
 
 def _get_entailment_scores(model, tokenizer, sentences, question, batch_size=16):
     inputs = tokenizer([f"premise: {s} hypothesis: {question}" for s in sentences], 
@@ -88,7 +91,8 @@ def get_informativeness(out_file, chat_directory, content_directory, questions_f
                 chat_history = json.load(f)
             questions = [msg['content'] for msg in chat_history if msg['role'] == role]
 
-        informativeness_per_doc = get_informativeness_per_doc(model, tokenizer, content, questions)
+        split_by_lines = True if 'song_lyrics' in content_fname else False
+        informativeness_per_doc = get_informativeness_per_doc(model, tokenizer, content, questions, split_by_lines)
         scores[doc_name] = informativeness_per_doc
 
     with open(out_file, 'w') as f:
