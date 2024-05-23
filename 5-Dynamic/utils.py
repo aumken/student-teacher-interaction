@@ -1,19 +1,20 @@
 import os
-import PyPDF2
+import pdfplumber
+from pdfminer.psparser import PSEOF
 from pathlib import Path
 import base64
 
 def extract_text_from_pdf(filepath):
     text = ""
-    with open(filepath, "rb") as file:
-        pdf = PyPDF2.PdfReader(file)
-        for page_num in range(len(pdf.pages)):
-            text += pdf.pages[page_num].extract_text()
-            if (
-                len(text) >= 1500
-            ):  # Check if the accumulated text has reached 1500 characters
-                break  # Stop reading further if 1500 characters have been reached
-    return text[:1500]  # Return only the first 1500 characters of the text
+    try:
+        with pdfplumber.open(filepath) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text()
+                if len(text) >= 1500:
+                    break
+    except PSEOF:  # Catch the PSEOF exception
+        pass  # Continue to the next line
+    return text[:1500]
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
