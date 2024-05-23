@@ -41,7 +41,7 @@ def preprocess_static_results(static_results_dir):
         if isinstance(expr, float) and np.isnan(expr):
             return expr
         a, b = expr.strip().split('/')
-        if a == '0' and b == '0':
+        if b == '0':
             return np.nan
         return float(a) / float(b)
     all_static_results = []
@@ -50,10 +50,10 @@ def preprocess_static_results(static_results_dir):
         fname = os.path.join(static_results_dir, f'{context}.xlsx')
         df = pd.read_excel(fname, index_col=0)
         scores = list(map(_eval_expr, df['S2 Score'].tolist()))
-        all_static_results += [{'accuracy': s, 'method': 'static student', 'context': context, 'turn': t} for s in scores for t in range(0, 5)]
+        all_static_results += [{'accuracy': s, 'method': 'static student', 'context': context, 'turn': t} for s in scores for t in range(0, 6)]
 
         scores = list(map(_eval_expr, df['T2 Score'].tolist()))
-        all_static_results += [{'accuracy': s, 'method': 'static teacher', 'context': context, 'turn': t} for s in scores for t in range(0, 5)]
+        all_static_results += [{'accuracy': s, 'method': 'static teacher', 'context': context, 'turn': t} for s in scores for t in range(0, 6)]
     
     return all_static_results
 
@@ -66,7 +66,8 @@ def preprocess_all_results(static_results_dir, plain_results_dir, lesson_results
         all_results += preprocess_dynamic_results(dir_name, method)
 
     # ignore NA repsonse
-    all_results = list(filter(lambda x: x['answers'] != 'NA', all_results))
+    #all_results = list(filter(lambda x: x['answers'] != 'NA', all_results))
+    all_results = list(filter(lambda x: not np.isnan(x['accuracy']), all_results))
 
     all_results += preprocess_static_results(static_results_dir)
     return all_results
@@ -148,9 +149,14 @@ def plot_information_coverage(info_results_dir, role, output_dir):
     df = pd.DataFrame(results)
     
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 8))
+    # create a color palette for the number of values in modes
+    methods = list(set(df['method'].tolist()))
+    colors = sns.color_palette('hls', len(methods))
+    # create a dictionary of modes and colors
+    palette = dict(zip(methods, colors))
     for i, context in enumerate(df['context'].unique()):
         ax = axes[i // 2, i % 2]
-        sns.lineplot(data=df[df['context'] == context], x='number of questions', y='information coverage', hue='method' if role != 'quiz' else None, marker='o', ax=ax, errorbar=None)
+        sns.lineplot(data=df[df['context'] == context], x='number of questions', y='information coverage', hue='method' if role != 'quiz' else None, marker='o', ax=ax, errorbar=None, palette=palette)
         ax.set_title(f"Context: {context}")
 
     plt.tight_layout()
