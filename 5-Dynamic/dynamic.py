@@ -95,7 +95,7 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
         entailment_idx = tokenizer.convert_tokens_to_ids(['1'])[0]
         
         with torch.no_grad():
-            scores = nli_model.generate(inputs, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores
+            scores = nli_model.generate(inputs, max_new_tokens=1, return_dict_in_generate=True, output_scores=True).scores
             #scores = model(**inputs).logits
             total_score = torch.sum(scores[0][:, entailment_idx], dim=0).cpu().item()
 
@@ -111,7 +111,7 @@ def get_refined_question_from_student(context, message_history, lesson, seed: in
         seed=seed)
     student_response = response.choices[0].message.content
 
-    questions = nltk.sent_tokenize(student_response) # split into questions
+    questions = nltk.sent_tokenize(student_response)[:10] # split into questions
     
     lesson_sentences = nltk.sent_tokenize(lesson)
     q_scores = [_get_entailment_score(nli_model, nli_tokenizer, lesson_sentences, q) for q in questions]
