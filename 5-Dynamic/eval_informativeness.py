@@ -36,16 +36,16 @@ def _get_entailment_scores(model, tokenizer, sentences, question, batch_size=16)
     with torch.no_grad():
         for i in range(0, inputs.shape[0], 16):
             batch = inputs[i:i+16, :]
-        batch_scores = nli_model.generate(batch, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores[0]
-        batch_scores = torch.nn.functional.softmax(batch_scores[:, indices], dim=0).cpu()
-        scores.append(batch_scores)
+            batch_scores = nli_model.generate(batch, max_new_tokens=10, return_dict_in_generate=True, output_scores=True).scores[0]
+            batch_scores = torch.nn.functional.softmax(batch_scores[:, indices], dim=0).cpu()
+            scores.append(batch_scores)
     
     scores = torch.vstack(scores)
+    diff = (scores[:, 0] - scores[:, 1]).unsqueeze(-1)
     
-    return scores
+    return diff
 
 def get_informativeness_per_doc(model, tokenizer, content, questions, split_by_newlines=False):
-    # TO DO: split_by_newlines just used for song_lyrics make it an argument or infer context type somehow
     doc_sentences =  content.split('\n') if split_by_newlines else nltk.sent_tokenize(content)
     all_scores = []
     informativeness_per_doc = []
@@ -57,11 +57,11 @@ def get_informativeness_per_doc(model, tokenizer, content, questions, split_by_n
         for sent in sents:
             scores = _get_entailment_scores(model, tokenizer, doc_sentences, sent)
             sent_scores.append(scores)
-        scores = torch.max(torch.vstack(sent_scores), dim=0).values
+        scores = torch.max(torch.vstack(sent_scores), dim=-1).values
         all_scores.append(scores)
         max_of_qs = torch.max(torch.vstack(all_scores), dim=0).values
         informativeness_per_doc.append(max_of_qs.mean().item())
-
+    #informativeness_per_doc = all_scores #torch.vstack(all_scores)
     return informativeness_per_doc
 
 def get_informativeness(out_file, chat_directory, content_directory, questions_folder, role, model, tokenizer):
@@ -97,6 +97,7 @@ def get_informativeness(out_file, chat_directory, content_directory, questions_f
 
     with open(out_file, 'w') as f:
         json.dump(scores, f, indent=4)
+    #torch.save(scores, out_file)
 
 
 if __name__ == '__main__':
