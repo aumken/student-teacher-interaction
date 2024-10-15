@@ -24,7 +24,7 @@ dot_pattern = re.compile(r"^\d+\.\s*([A-D])\s*$", re.MULTILINE)
 
 
 async def get_model_answers(questions, static_info, context, max_retries=10, seed = 123):
-    model = "gpt-4-turbo" if context == "images" else "gpt-3.5-turbo"
+    model = "gpt-4o" if context == "images" else "gpt-3.5-turbo"
     expected_answers = 5 if context == "images" else 10
     retries = 0
     random.seed(seed)
