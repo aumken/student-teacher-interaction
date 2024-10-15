@@ -72,7 +72,7 @@ async def get_model_answers(questions, context, max_retries=3, seed=123):
     return None
 
 
-async def process_question_file(questions_path, answers_path, context):
+async def process_question_file(questions_path, answers_path, context, seed = 123):
     expected_answers = 5 if context == "images" else 10
 
     # Check if the answers file already exists and has the expected number of answers
@@ -86,14 +86,14 @@ async def process_question_file(questions_path, answers_path, context):
 
     async with aiofiles.open(questions_path, "r") as file:
         questions = await file.read()
-    model_answers = await get_model_answers(questions, context)
+    model_answers = await get_model_answers(questions, context, seed)
     if model_answers and len(model_answers) == expected_answers:
         Path(answers_path.parent).mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(answers_path, "w") as file:
             await file.write(model_answers)
 
 
-async def process_directory(context, questions_dir, answers_dir):
+async def process_directory(context, questions_dir, answers_dir, seed = 123):
     print(f"Starting directory processing for {questions_dir}")
     tasks = []
     for root, _, files in os.walk(questions_dir):
@@ -105,21 +105,22 @@ async def process_directory(context, questions_dir, answers_dir):
                     f"s1_{relative_path.stem[9:]}.md"
                 )
                 task = asyncio.create_task(
-                    process_question_file(questions_path, answers_path, context)
+                    process_question_file(questions_path, answers_path, context, seed)
                 )
                 tasks.append(task)
     await asyncio.gather(*tasks)
 
 
-async def main(questions_base_dir, answers_base_dir):
+async def main(questions_base_dir, answers_base_dir, seed = 123):
     for context in os.listdir(questions_base_dir):
         context_questions_dir = questions_base_dir / context
         if context_questions_dir.is_dir():
             context_answers_dir = answers_base_dir / context
-            await process_directory(context, context_questions_dir, context_answers_dir)
+            await process_directory(context, context_questions_dir, context_answers_dir, seed)
 
 
 if __name__ == "__main__":
-    questions_base_dir = Path("b_questions")
+    seed = 915
+    questions_base_dir = Path("data/b_questions")
     answers_base_dir = Path("s1_answers")
-    asyncio.run(main(questions_base_dir, answers_base_dir))
+    asyncio.run(main(questions_base_dir, answers_base_dir, seed))

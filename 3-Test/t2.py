@@ -9,7 +9,7 @@ import aiofiles
 import pdfplumber
 import PyPDF2
 import requests
-from dotenv import load_dotenv
+import random
 from openai import AsyncOpenAI
 from pdfminer.psparser import PSEOF
 
@@ -163,7 +163,7 @@ async def get_image_answers(questions, image_path, static_info, max_retries=10, 
 
 
 async def process_question_file(
-    questions_path, original_info_path, static_info_path, answers_path, context
+    questions_path, original_info_path, static_info_path, answers_path, context, seed = 123
 ):
     if (
         not questions_path.exists()
@@ -212,11 +212,11 @@ async def process_question_file(
     # Generate model answers based on the original information and static lesson
     if original_info_path.suffix == ".jpg":
         model_answers = await get_image_answers(
-            questions, original_info_path, static_info
+            questions, original_info_path, static_info, seed
         )
     else:
         model_answers = await get_model_answers(
-            questions, original_info, static_info, context
+            questions, original_info, static_info, context, seed
         )
 
     if model_answers and len(model_answers) == expected_answers:
@@ -226,7 +226,7 @@ async def process_question_file(
 
 
 async def process_directory(
-    context, questions_dir, original_info_dir, static_dir, answers_dir
+    context, questions_dir, original_info_dir, static_dir, answers_dir, seed = 123
 ):
     print(f"Starting directory processing for {questions_dir}")
     tasks = []
@@ -280,6 +280,7 @@ async def process_directory(
                         static_info_path,
                         answers_path,
                         context,
+                        seed
                     )
                 )
                 tasks.append(task)
@@ -288,7 +289,7 @@ async def process_directory(
 
 
 async def main(
-    questions_base_dir, original_info_base_dir, static_base_dir, answers_base_dir
+    questions_base_dir, original_info_base_dir, static_base_dir, answers_base_dir, seed = 123
 ):
     for context in os.listdir(questions_base_dir):
         context_questions_dir = questions_base_dir / context
@@ -306,13 +307,15 @@ async def main(
                 context_original_info_dir,
                 context_static_dir,
                 context_answers_dir,
+                seed
             )
 
 
 if __name__ == "__main__":
-    questions_base_dir = Path("b_questions")
-    original_info_base_dir = Path("a_files")
-    static_base_dir = Path("d_static")
+    seed = 915
+    questions_base_dir = Path("data/b_questions")
+    original_info_base_dir = Path("data/a_files")
+    static_base_dir = Path("data/d_static")
     answers_base_dir = Path("t2_answers")
 
     asyncio.run(

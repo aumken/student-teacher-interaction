@@ -127,10 +127,10 @@ def calculate_score(original, student):
 
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-base_dir = os.path.abspath(os.path.join(script_dir, "..", "a_files"))
-static_dir = os.path.join(script_dir, "..", "d_static")
-questions_dir = os.path.join(script_dir, "..", "b_questions")
-answers_dir = os.path.join(script_dir, "..", "c_answers")
+base_dir = os.path.abspath(os.path.join(script_dir, "..", "data/a_files"))
+static_dir = os.path.join(script_dir, "..", "data/d_static")
+questions_dir = os.path.join(script_dir, "..", "data/b_questions")
+answers_dir = os.path.join(script_dir, "..", "data/c_answers")
 s1_answers_dir = os.path.join(script_dir, "..", "s1_answers")
 s2_answers_dir = os.path.join(script_dir, "..", "s2_answers")
 t1_answers_dir = os.path.join(script_dir, "..", "t1_answers")

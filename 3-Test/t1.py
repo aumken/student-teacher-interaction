@@ -153,7 +153,7 @@ async def get_image_answers(questions, image_path, max_retries=10, seed=123):
 
 
 async def process_question_file(
-    questions_path, original_info_path, answers_path, context
+    questions_path, original_info_path, answers_path, context, seed=123
 ):
     if not questions_path.exists() or not original_info_path.exists():
         print(f"Skipping {questions_path.name} due to missing information file.")
@@ -176,13 +176,13 @@ async def process_question_file(
     # Determine the file format and read content accordingly
     if original_info_path.suffix == ".pdf":
         original_info = extract_text_from_pdf(original_info_path)
-        model_answers = await get_model_answers(questions, original_info, context)
+        model_answers = await get_model_answers(questions, original_info, context, seed)
     elif original_info_path.suffix == ".md":
         async with aiofiles.open(original_info_path, "r") as file:
             original_info = await file.read()
-        model_answers = await get_model_answers(questions, original_info, context)
+        model_answers = await get_model_answers(questions, original_info, context, seed)
     elif original_info_path.suffix == ".jpg":
-        model_answers = await get_image_answers(questions, original_info_path)
+        model_answers = await get_image_answers(questions, original_info_path, seed)
     else:
         print(f"Unsupported file format: {original_info_path.suffix}")
         return
@@ -193,7 +193,7 @@ async def process_question_file(
             await file.write(model_answers)
 
 
-async def process_directory(context, questions_dir, original_info_dir, answers_dir):
+async def process_directory(context, questions_dir, original_info_dir, answers_dir, seed = 123):
     print(f"Starting directory processing for {questions_dir}")
     tasks = []
 
@@ -232,7 +232,7 @@ async def process_directory(context, questions_dir, original_info_dir, answers_d
 
                 task = asyncio.create_task(
                     process_question_file(
-                        questions_path, original_info_path, answers_path, context
+                        questions_path, original_info_path, answers_path, context, seed
                     )
                 )
                 tasks.append(task)
@@ -240,7 +240,7 @@ async def process_directory(context, questions_dir, original_info_dir, answers_d
     await asyncio.gather(*tasks)
 
 
-async def main(questions_base_dir, original_info_base_dir, answers_base_dir):
+async def main(questions_base_dir, original_info_base_dir, answers_base_dir, seed = 123):
     for context in os.listdir(questions_base_dir):
         context_questions_dir = questions_base_dir / context
         context_original_info_dir = original_info_base_dir / context
@@ -251,12 +251,14 @@ async def main(questions_base_dir, original_info_base_dir, answers_base_dir):
                 context_questions_dir,
                 context_original_info_dir,
                 context_answers_dir,
+                seed
             )
 
 
 if __name__ == "__main__":
-    questions_base_dir = Path("b_questions")
-    original_info_base_dir = Path("a_files")
+    seed = 915
+    questions_base_dir = Path("data/b_questions")
+    original_info_base_dir = Path("data/a_files")
     answers_base_dir = Path("t1_answers")
 
-    asyncio.run(main(questions_base_dir, original_info_base_dir, answers_base_dir))
+    asyncio.run(main(questions_base_dir, original_info_base_dir, answers_base_dir, seed))
